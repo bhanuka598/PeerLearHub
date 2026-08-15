@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
+  // Brand Colors
+  static const Color primaryColor = Color(0xFF0F766E); // Teal
+  static const Color surfaceColor = Colors.white;
+  
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -42,7 +46,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0F766E),
+          backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           textStyle: const TextStyle(
