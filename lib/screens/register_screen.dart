@@ -17,71 +17,75 @@ class RegisterScreen extends StatelessWidget {
         title: SectionTitle(title: 'Register'),
         centerTitle: true,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(height: AppSpacing.md),
+      body: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              const SizedBox(height: AppSpacing.md),
 
-            TextBox(
-              label: 'Full Name',
-              controller: TextEditingController(),
-            ),
+              TextBox(
+                label: 'Full Name',
+                controller: TextEditingController(),
+              ),
 
-            const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
 
-            DropdownMenu(
-              label: 'Role',
-              options: ['Student', 'Teacher', 'Skill Exchange Member', 'Moderator'],
-              selectedOption: null,
-              onChanged: (String? newValue) {
-                // Handle role selection change
-              },
-            ),
+              DropdownMenu(
+                label: 'Role',
+                options: ['Student', 'Teacher', 'Skill Exchange Member', 'Moderator'],
+                selectedOption: null,
+                onChanged: (String? newValue) {
+                  // Handle role selection change
+                },
+              ),
 
-            const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
 
-            TextBox(
-              label: 'Username',
-              controller: TextEditingController(),
-            ),
+              TextBox(
+                label: 'Username',
+                controller: TextEditingController(),
+              ),
 
-            const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
 
-            TextBox(
-              label: 'Password',
-              controller: TextEditingController(),
-              obscureText: true,
-            ),
+              TextBox(
+                label: 'Password',
+                controller: TextEditingController(),
+                obscureText: true,
+              ),
 
-            const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
 
-            TextBox(
-              label: 'Confirm Password',
-              controller: TextEditingController(),
-              obscureText: true,
-            ),
+              TextBox(
+                label: 'Confirm Password',
+                controller: TextEditingController(),
+                obscureText: true,
+              ),
 
-            const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xl),
 
-            InteractionButton(
-              label: 'Register',
-              onPressed: () {
-                // Navigate to the loading screen
-                context.go('/register');
-              },
-            ),
+              InteractionButton(
+                label: 'Register',
+                onPressed: () {
+                  // Navigate to the loading screen
+                  context.go('/register');
+                },
+              ),
 
-            const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
 
-            InteractionButtonInvert(
-              label: 'Login',
-              onPressed: () {
-                // Navigate to the registration screen
-                context.go('/login');
-              },
-            ),
-          ],
+              InteractionButtonInvert(
+                label: 'Login',
+                onPressed: () {
+                  // Navigate to the registration screen
+                  context.go('/login');
+                },
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+            ],
+          ),
         ),
       ),
     );
