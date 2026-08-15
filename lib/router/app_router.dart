@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
+import 'package:peer_learn_hub/screens/register_screen.dart';
 
 class RouterClass {
   static final GoRouter router = GoRouter(
@@ -16,6 +17,12 @@ class RouterClass {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+
+      // Register Screen
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
       ),
     ],
   );
