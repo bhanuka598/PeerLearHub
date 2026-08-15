@@ -1,15 +1,21 @@
 import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
+import 'package:peer_learn_hub/screens/login_screen.dart';
 
 class RouterClass {
-  final router = GoRouter(
+  static final GoRouter router = GoRouter(
+    initialLocation: '/',
     routes: [
-      // Login Screen
+      // Loading Screen
       GoRoute(
         path: '/',
-        builder: (context, state) {
-          return const LoadingScreen();
-        },
+        builder: (context, state) => const LoadingScreen(),
+      ),
+
+      // Login Screen
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
       ),
     ],
   );

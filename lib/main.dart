@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:peer_learn_hub/screens/loading_screen.dart';
-import 'theme/app_theme.dart';
+import 'package:peer_learn_hub/router/app_router.dart';
+import 'package:peer_learn_hub/theme/app_theme.dart';
 
 void main() {
   runApp(const PeerLearnHub());
@@ -11,10 +11,11 @@ class PeerLearnHub extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
+      title: 'Peer Learn Hub',
       theme: AppTheme.lightTheme,
-      home: const LoadingScreen(),
+      routerConfig: RouterClass.router,
     );
   }
 }
