@@ -9,6 +9,7 @@ class AppTheme {
   static const Color iconBackground = Color(0xFFE0F2F1);
   static const Color backgroundColor = Color(0xFFF5F7FA);
   static const Color cardColor = Colors.white;
+  static const Color surfaceColor = cardColor;
   static const Color textPrimary = Color(0xFF212121);
   static const Color textSecondary = Color(0xFF757575);
   static const Color statusActiveBg = Color(0xFFE8F5E9);

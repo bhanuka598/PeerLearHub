@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' hide DropdownMenu;
 import 'package:go_router/go_router.dart';
-import 'package:peer_learn_hub/theme/app_spacing.dart';
+import 'package:peer_learn_hub/core/theme/app_spacing.dart';
 import 'package:peer_learn_hub/widgets/section_title.dart';
 import 'package:peer_learn_hub/widgets/interaction_button.dart';
 import 'package:peer_learn_hub/widgets/interaction_button_invert.dart';

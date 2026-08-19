@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:peer_learn_hub/theme/app_theme.dart';
+import 'package:peer_learn_hub/core/theme/app_theme.dart';
 
 class InteractionButtonInvert extends StatelessWidget {
   final String label;
