@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
-import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/lesson.dart';
 import '../../../models/provider_dashboard_stats.dart';
@@ -161,7 +161,7 @@ class _SkillProviderDashboardScreenState
           subtitle: 'Publish a new skill or lesson offering',
           icon: Icons.add_circle_outline,
           onTap: () {
-            Navigator.of(context).pushNamed(AppRoutes.createLesson);
+            context.push('/skill-provider/create');
           },
         ),
         QuickActionCard(
@@ -169,7 +169,7 @@ class _SkillProviderDashboardScreenState
           subtitle: 'Manage all your lesson listings',
           icon: Icons.list_alt_outlined,
           onTap: () {
-            Navigator.of(context).pushNamed(AppRoutes.myLessons);
+            context.push('/skill-provider/my-lessons');
           },
         ),
       ],
@@ -194,7 +194,7 @@ class _SkillProviderDashboardScreenState
             if (lessons.isNotEmpty)
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pushNamed(AppRoutes.myLessons);
+                  context.push('/skill-provider/my-lessons');
                 },
                 child: const Text('View All'),
               ),

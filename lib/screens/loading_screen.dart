@@ -59,6 +59,46 @@ class LoadingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
 
+              OutlinedButton.icon(
+                onPressed: () {
+                  context.go('/skill-provider');
+                },
+                icon: const Icon(Icons.school_outlined),
+                label: const Text('Open Skill Provider Hub'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0F766E),
+                  side: const BorderSide(color: Color(0xFF0F766E)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              OutlinedButton.icon(
+                onPressed: () {
+                  context.go('/moderation');
+                },
+                icon: const Icon(Icons.verified_user_outlined),
+                label: const Text('Open Moderation Hub'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0F766E),
+                  side: const BorderSide(color: Color(0xFF0F766E)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
               // Secondary: Go to Login
               OutlinedButton.icon(
                 onPressed: () {
@@ -81,4 +121,4 @@ class LoadingScreen extends StatelessWidget {
       ),
     );
   }
-}
+}

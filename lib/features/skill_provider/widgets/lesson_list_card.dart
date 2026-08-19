@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
 import '../../../models/lesson.dart';
@@ -186,10 +186,7 @@ class LessonListCard extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.of(context).pop();
-              Navigator.of(context).pushNamed(
-                AppRoutes.editLesson,
-                arguments: lesson,
-              );
+              context.push('/skill-provider/edit', extra: lesson);
             },
             child: const Text('Edit'),
           ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 
 class EmptyLessonsState extends StatelessWidget {
@@ -45,7 +45,7 @@ class EmptyLessonsState extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.of(context).pushNamed(AppRoutes.createLesson);
+                context.push('/skill-provider/create');
               },
               icon: const Icon(Icons.add),
               label: const Text('Create Your First Lesson'),
