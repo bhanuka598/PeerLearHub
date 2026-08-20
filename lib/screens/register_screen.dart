@@ -68,8 +68,8 @@ class RegisterScreen extends StatelessWidget {
               InteractionButton(
                 label: 'Register',
                 onPressed: () {
-                  // Navigate to the loading screen
-                  context.go('/register');
+                  // Continue to the main app after demo registration.
+                  context.go('/skill-exchange');
                 },
               ),
 

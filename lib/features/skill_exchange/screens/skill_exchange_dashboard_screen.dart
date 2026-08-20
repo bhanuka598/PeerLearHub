@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../models/skill_exchange_models.dart';
 import '../providers/skill_exchange_provider.dart';
 import '../widgets/ai_suggestion_card.dart';
@@ -91,6 +92,21 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
                     const Text('Nirmal (Student)'),
                   ],
                 ),
+              ),
+            ],
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Open another hub',
+            icon: const Icon(Icons.apps_outlined),
+            onSelected: context.go,
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: '/skill-provider',
+                child: Text('Skill Provider Hub'),
+              ),
+              PopupMenuItem(
+                value: '/moderation',
+                child: Text('Moderation Hub'),
               ),
             ],
           ),
