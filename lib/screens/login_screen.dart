@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/auth/app_auth.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -22,7 +24,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _login() {
     if (_formKey.currentState!.validate()) {
-      context.go('/skill-exchange');
+      final username = _usernameController.text.trim().toLowerCase();
+
+      if (username.contains('admin')) {
+        AppAuth.instance.setRole(AppUserRole.admin);
+      } else if (username.contains('teacher') || username.contains('lecturer')) {
+        AppAuth.instance.setRole(AppUserRole.teacher);
+      } else {
+        AppAuth.instance.setRole(AppUserRole.student);
+      }
+
+      context.go(AppAuth.instance.getHomeRoute());
     }
   }
 
