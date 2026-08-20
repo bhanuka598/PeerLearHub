@@ -9,13 +9,17 @@ class TealDashboardHeader extends StatelessWidget {
     required this.title,
     required this.welcomeTitle,
     required this.welcomeSubtitle,
+    this.currentRole,
     this.onRefresh,
+    this.onLogout,
   });
 
+  final String? currentRole;
   final String title;
   final String welcomeTitle;
   final String welcomeSubtitle;
   final VoidCallback? onRefresh;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +46,35 @@ class TealDashboardHeader extends StatelessWidget {
                           ),
                     ),
                   ),
+                  if (currentRole != null)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        currentRole!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
                   if (onRefresh != null)
                     IconButton(
                       onPressed: onRefresh,
                       icon: const Icon(Icons.refresh, color: Colors.white),
                       tooltip: 'Refresh',
+                    ),
+                  if (onLogout != null)
+                    IconButton(
+                      onPressed: onLogout,
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      tooltip: 'Logout',
                     ),
                 ],
               ),

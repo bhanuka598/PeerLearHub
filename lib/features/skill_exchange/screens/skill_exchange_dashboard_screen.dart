@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/auth/app_auth.dart';
 import '../models/skill_exchange_models.dart';
 import '../providers/skill_exchange_provider.dart';
 import '../widgets/ai_suggestion_card.dart';
@@ -61,6 +62,22 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
         backgroundColor: const Color(0xFF0F766E),
         foregroundColor: Colors.white,
         actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              AppAuth.instance.currentRole?.name.toUpperCase() ?? 'GUEST',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
           // Role toggle for quick demo of Student vs Lecturer business rules
           PopupMenuButton<UserRole>(
             tooltip: 'Switch Simulated Role',
@@ -109,6 +126,14 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
                 child: Text('Moderation Hub'),
               ),
             ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              AppAuth.instance.logout();
+              context.go('/');
+            },
+            tooltip: 'Logout',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),

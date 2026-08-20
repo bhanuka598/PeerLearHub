@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/auth/app_auth.dart';
 import '../../../core/constants/app_colors.dart';
 import '../services/verification_service.dart';
 import '../services/moderation_service.dart';
@@ -57,10 +59,34 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
       appBar: AppBar(
         title: const Text('Moderator Dashboard'),
         actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              AppAuth.instance.currentRole?.name.toUpperCase() ?? 'GUEST',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadStatistics,
             tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              AppAuth.instance.logout();
+              context.go('/');
+            },
+            tooltip: 'Logout',
           ),
         ],
       ),
@@ -81,7 +107,7 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                         gradient: LinearGradient(
                           colors: [
                             AppColors.primaryTeal,
-                            AppColors.primaryTeal.withOpacity(0.8),
+                            AppColors.primaryTeal.withValues(alpha: 0.8),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -102,7 +128,7 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                           Text(
                             'Manage verifications and reports',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 16,
                             ),
                           ),

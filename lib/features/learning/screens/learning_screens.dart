@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/app_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/learning_store.dart';
 import '../models/learning_course.dart';
@@ -24,7 +25,39 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               (_category == 'All' || course.category == _category) &&
               ('${course.title} ${course.category} ${course.instructor}'.toLowerCase().contains(_query.toLowerCase()))).toList();
           return Scaffold(
-            appBar: AppBar(title: const Text('PeerLearnHub'), actions: [IconButton(onPressed: () => context.push('/learning/my-courses'), icon: const Icon(Icons.school_outlined))]),
+            appBar: AppBar(
+              title: const Text('PeerLearnHub'),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    AppAuth.instance.currentRole?.name.toUpperCase() ?? 'GUEST',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => context.push('/learning/my-courses'),
+                  icon: const Icon(Icons.school_outlined),
+                ),
+                IconButton(
+                  onPressed: () {
+                    AppAuth.instance.logout();
+                    context.go('/');
+                  },
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Logout',
+                ),
+              ],
+            ),
             body: SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(16, 20, 16, 24), children: [
               Text('Find Your Next Skill', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/app_auth.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/lesson.dart';
@@ -74,7 +75,12 @@ class _SkillProviderDashboardScreenState
                 welcomeTitle: 'Welcome Back!',
                 welcomeSubtitle:
                     'Share your knowledge and help others learn new skills.',
+                currentRole: AppAuth.instance.currentRole?.name.toUpperCase() ?? 'GUEST',
                 onRefresh: _loadStats,
+                onLogout: () {
+                  AppAuth.instance.logout();
+                  context.go('/');
+                },
               ),
             ),
             SliverPadding(
