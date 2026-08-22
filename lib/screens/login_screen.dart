@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
+import '../core/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,99 +13,282 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _login() {
-    if (_formKey.currentState!.validate()) {
-      final username = _usernameController.text.trim().toLowerCase();
-
-      if (username.contains('admin')) {
-        AppAuth.instance.setRole(AppUserRole.admin);
-      } else if (username.contains('teacher') || username.contains('lecturer')) {
-        AppAuth.instance.setRole(AppUserRole.teacher);
-      } else {
-        AppAuth.instance.setRole(AppUserRole.student);
-      }
-
-      context.go(AppAuth.instance.getHomeRoute());
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) {
+      return 'Please enter your email address';
     }
+    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+    if (!emailRegex.hasMatch(email)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
+    );
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text;
+
+    if (password.length < 6) {
+      _showError('Invalid email or password');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+
+    if (!mounted) {
+      return;
+    }
+
+    if (email.contains('admin')) {
+      AppAuth.instance.setRole(AppUserRole.admin);
+    } else if (email.contains('teacher') || email.contains('lecturer')) {
+      AppAuth.instance.setRole(AppUserRole.teacher);
+    } else {
+      AppAuth.instance.setRole(AppUserRole.student);
+    }
+
+    setState(() => _isSubmitting = false);
+    context.go(AppAuth.instance.getHomeRoute());
   }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Login'), centerTitle: true),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.iconBackground,
+                    foregroundColor: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Welcome Back!',
+                  style: textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Log in to continue learning and sharing skills.',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Email Address',
+                          hintText: 'Enter your email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                        ),
+                        validator: _validateEmail,
+                      ),
+                      const SizedBox(height: 18),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _login(),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          hintText: 'Enter your password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
+                            },
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if ((value ?? '').isEmpty) {
+                            return 'Enter your password';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => context.go('/forgot-password'),
+                          child: const Text('Forgot Password?'),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _isSubmitting ? null : _login,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  'Log In',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 26),
+                Row(
                   children: [
-                    const Icon(
-                      Icons.account_circle_outlined,
-                      size: 72,
-                      color: Color(0xFF0F766E),
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _usernameController,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(Icons.person_outline),
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'OR',
+                        style: textTheme.labelLarge?.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      validator: (value) => value == null || value.trim().isEmpty
-                          ? 'Enter your username'
-                          : null,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      onFieldSubmitted: (_) => _login(),
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
-                      ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Enter your password'
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _login,
-                      child: const Text('Login'),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: () => context.go('/register'),
-                      child: const Text('Register'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => context.go('/'),
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('Back to Home'),
-                    ),
+                    const Expanded(child: Divider()),
                   ],
                 ),
-              ),
+                const SizedBox(height: 22),
+                _SocialButton(
+                  label: 'Continue with Google',
+                  icon: Icons.g_mobiledata_rounded,
+                  onPressed: () {},
+                ),
+                const SizedBox(height: 12),
+                _SocialButton(
+                  label: 'Continue with Apple',
+                  icon: Icons.apple,
+                  onPressed: () {},
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: RichText(
+                    text: TextSpan(
+                      text: "Don't have an account? ",
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                      children: [
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: GestureDetector(
+                            onTap: () => context.go('/register'),
+                            child: Text(
+                              'Sign Up',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppTheme.textPrimary,
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        icon: Icon(icon, color: AppTheme.textPrimary),
+        label: Text(label),
       ),
     );
   }

@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color primaryColor = Color(0xFF00695C);
-  static const Color primaryLight = Color(0xFF00897B);
-  static const Color primaryDark = Color(0xFF004D40);
-  static const Color iconBackground = Color(0xFFE0F2F1);
-  static const Color backgroundColor = Color(0xFFF5F7FA);
+  static const Color primaryColor = Color(0xFF008F83);
+  static const Color primaryLight = Color(0xFF54B7AE);
+  static const Color primaryDark = Color(0xFF006B62);
+  static const Color iconBackground = Color(0xFFE7F8F6);
+  static const Color backgroundColor = Color(0xFFF5F7F9);
   static const Color cardColor = Colors.white;
   static const Color surfaceColor = cardColor;
-  static const Color textPrimary = Color(0xFF212121);
-  static const Color textSecondary = Color(0xFF757575);
+  static const Color textPrimary = Color(0xFF1D1F22);
+  static const Color textSecondary = Color(0xFF5F6871);
   static const Color statusActiveBg = Color(0xFFE8F5E9);
   static const Color statusActiveText = Color(0xFF198754);
   static const Color statusDraftBg = Color(0xFFFEF9E7);
@@ -26,16 +26,16 @@ class AppTheme {
   );
 
   static BoxDecoration get cardDecoration => BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      );
+    color: cardColor,
+    borderRadius: BorderRadius.circular(12),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.06),
+        blurRadius: 8,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  );
 
   static ThemeData get lightTheme {
     final colorScheme = ColorScheme.fromSeed(
@@ -61,9 +61,7 @@ class AppTheme {
         color: cardColor,
         elevation: 2,
         shadowColor: Colors.black.withValues(alpha: 0.08),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -84,14 +82,19 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 0,
         ),
       ),
@@ -99,7 +102,9 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryColor,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           side: const BorderSide(color: primaryColor),
         ),
       ),

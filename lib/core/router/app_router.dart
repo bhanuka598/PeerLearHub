@@ -9,8 +9,10 @@ import 'package:peer_learn_hub/features/skill_provider/screens/edit_lesson_scree
 import 'package:peer_learn_hub/features/skill_provider/screens/my_lessons_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/skill_provider_dashboard_screen.dart';
 import 'package:peer_learn_hub/models/lesson.dart';
+import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
+import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
 import 'package:peer_learn_hub/screens/register_screen.dart';
 
 class RouterClass {
@@ -33,6 +35,14 @@ class RouterClass {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/otp-verification',
+        builder: (context, state) => const OtpVerificationScreen(),
       ),
       GoRoute(
         path: '/skill-exchange',

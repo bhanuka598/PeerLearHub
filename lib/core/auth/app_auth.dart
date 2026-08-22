@@ -32,7 +32,14 @@ class AppAuth {
 
   bool canAccess(String location) {
     final cleanLocation = location.split('?').first;
-    final allowedForGuest = ['/', '/login', '/register'];
+    final allowedForGuest = [
+      '/',
+      '/loading',
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/otp-verification',
+    ];
     if (allowedForGuest.contains(cleanLocation)) {
       return true;
     }
