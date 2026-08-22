@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
 import '../core/theme/app_theme.dart';
+import '../widgets/social_auth_button.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -21,6 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
   bool _agreedToTerms = false;
   String _selectedGoal = 'Learn New Skills';
 
@@ -107,6 +109,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     AppAuth.instance.setRole(AppUserRole.student);
     setState(() => _isSubmitting = false);
     context.go('/otp-verification');
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleSubmitting = true);
+
+    try {
+      final success = await AppAuth.instance.signInWithGoogle();
+      if (!mounted) {
+        return;
+      }
+
+      if (success) {
+        context.go(AppAuth.instance.getHomeRoute());
+      } else {
+        _showError('Google sign-in failed. Please try again.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Google sign-in failed. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -306,6 +333,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   style: TextStyle(fontWeight: FontWeight.w700),
                                 ),
                         ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'OR',
+                              style: textTheme.labelLarge?.copyWith(
+                                color: AppTheme.textSecondary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      SocialAuthButton(
+                        label: 'Continue with Google',
+                        icon: Icons.g_mobiledata_rounded,
+                        isLoading: _isGoogleSubmitting,
+                        onPressed: _isGoogleSubmitting
+                            ? null
+                            : _signInWithGoogle,
                       ),
                     ],
                   ),

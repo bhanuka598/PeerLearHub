@@ -1,3 +1,5 @@
+import 'package:peer_learn_hub/core/auth/auth_service.dart';
+
 enum AppUserRole { student, teacher, admin }
 
 class AppAuth {
@@ -11,6 +13,14 @@ class AppAuth {
 
   void setRole(AppUserRole role) {
     _currentRole = role;
+  }
+
+  Future<bool> signInWithGoogle() async {
+    final signedIn = await AuthService.instance.signInWithGoogle();
+    if (signedIn) {
+      setRole(AppUserRole.student);
+    }
+    return signedIn;
   }
 
   void logout() {

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
 import '../core/theme/app_theme.dart';
+import '../widgets/social_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
 
   @override
   void dispose() {
@@ -73,6 +75,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isSubmitting = false);
     context.go(AppAuth.instance.getHomeRoute());
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleSubmitting = true);
+
+    try {
+      final success = await AppAuth.instance.signInWithGoogle();
+      if (!mounted) {
+        return;
+      }
+
+      if (success) {
+        context.go(AppAuth.instance.getHomeRoute());
+      } else {
+        _showError('Google sign-in failed. Please try again.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Google sign-in failed. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -216,13 +243,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 22),
-                _SocialButton(
+                SocialAuthButton(
                   label: 'Continue with Google',
                   icon: Icons.g_mobiledata_rounded,
-                  onPressed: () {},
+                  isLoading: _isGoogleSubmitting,
+                  onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
                 ),
                 const SizedBox(height: 12),
-                _SocialButton(
+                SocialAuthButton(
                   label: 'Continue with Apple',
                   icon: Icons.apple,
                   onPressed: () {},
@@ -257,38 +285,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.textPrimary,
-          side: const BorderSide(color: Color(0xFFE5E7EB)),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        icon: Icon(icon, color: AppTheme.textPrimary),
-        label: Text(label),
       ),
     );
   }
