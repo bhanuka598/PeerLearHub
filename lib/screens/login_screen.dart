@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
+import '../core/auth/auth_service.dart';
 import '../core/theme/app_theme.dart';
 import '../widgets/social_auth_button.dart';
 
@@ -89,11 +90,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         context.go(AppAuth.instance.getHomeRoute());
       } else {
-        _showError('Google sign-in failed. Please try again.');
+        _showError(
+          AuthService.instance.lastError ??
+              'Google sign-in failed. Please try again.',
+        );
       }
     } catch (_) {
       if (mounted) {
-        _showError('Google sign-in failed. Please try again.');
+        _showError(
+          AuthService.instance.lastError ??
+              'Google sign-in failed. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

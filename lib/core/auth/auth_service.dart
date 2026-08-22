@@ -12,9 +12,16 @@ class AuthService {
   static final AuthService instance = AuthService._();
 
   static const String _defaultBackendUrl = 'http://localhost:4000';
+  static const String _googleServerClientId =
+      '536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com';
 
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: _googleServerClientId,
+  );
+  String? _lastError;
+
+  String? get lastError => _lastError;
 
   static String get backendBaseUrl {
     if (kIsWeb) {
@@ -49,9 +56,11 @@ class AuthService {
   }
 
   Future<bool> signInWithGoogle() async {
+    _lastError = null;
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
+        _lastError = 'Google sign-in was cancelled.';
         return false;
       }
 
@@ -61,11 +70,14 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final userCredential = await _firebaseAuth.signInWithCredential(
+        credential,
+      );
       final firebaseIdToken = await userCredential.user?.getIdToken();
 
       if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
         await _firebaseAuth.signOut();
+        _lastError = 'Firebase did not return an ID token.';
         return false;
       }
 
@@ -77,9 +89,15 @@ class AuthService {
       }
 
       return true;
-    } on FirebaseAuthException {
+    } on FirebaseAuthException catch (error) {
+      _lastError = 'Firebase sign-in failed (${error.code}).';
+      debugPrint(
+        'Firebase Google sign-in failed: ${error.code} ${error.message}',
+      );
       return false;
-    } on Exception {
+    } on Exception catch (error) {
+      _lastError = 'Google sign-in failed: $error';
+      debugPrint('Google sign-in failed: $error');
       return false;
     }
   }

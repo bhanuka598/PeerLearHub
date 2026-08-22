@@ -2,15 +2,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:peer_learn_hub/core/router/app_router.dart';
 import 'package:peer_learn_hub/core/theme/app_theme.dart';
+import 'package:peer_learn_hub/firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp();
-  } catch (_) {
-    // Firebase config is required for Google auth to work on Android/iOS.
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const PeerLearnHub());
 }
