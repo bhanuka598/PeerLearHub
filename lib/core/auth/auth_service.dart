@@ -125,7 +125,7 @@ class AuthService {
 
         userCredential = await firebaseAuth.signInWithCredential(credential);
       }
-      final firebaseIdToken = await userCredential.user?.getIdToken();
+      final firebaseIdToken = await userCredential.user?.getIdToken(true);
 
       if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
         await firebaseAuth.signOut();

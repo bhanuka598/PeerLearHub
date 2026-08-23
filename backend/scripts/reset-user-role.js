@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import dotenv from 'dotenv';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 dotenv.config();
 
-const [identifier, role] = process.argv.slice(2);
-const allowedRoles = new Set(['student', 'teacher', 'admin']);
+const [identifier] = process.argv.slice(2);
 
-if (!identifier || !allowedRoles.has(role)) {
-  console.error('Usage: npm run set-role -- <firebase-uid-or-email> <student|teacher|admin>');
+if (!identifier) {
+  console.error('Usage: npm run reset-role -- <firebase-uid-or-email>');
   process.exit(1);
 }
 
@@ -36,6 +36,10 @@ const user = identifier.includes('@')
   ? await auth.getUserByEmail(identifier)
   : await auth.getUser(identifier);
 
-await auth.setCustomUserClaims(user.uid, { role });
-console.log(`Assigned role '${role}' to ${user.email ?? user.uid}.`);
-console.log('The user must sign out and sign in again before the new role is used.');
+await auth.setCustomUserClaims(user.uid, {});
+await getFirestore().collection('users').doc(user.uid).set(
+  { role: null },
+  { merge: true },
+);
+console.log(`Reset the role for ${user.email ?? user.uid}.`);
+console.log('Sign out and sign in again to choose a new role.');

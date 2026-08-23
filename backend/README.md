@@ -37,3 +37,11 @@ npm run set-role -- user@example.com admin
 ```
 
 The account must sign out and sign in again after changing its role. The backend only accepts `student`, `teacher`, and `admin`; unknown or missing claims fall back to `student`.
+
+To test the first-login role picker again for an existing account, reset it locally from the backend folder:
+
+```bash
+npm run reset-role -- user@example.com
+```
+
+Then sign out, sign in with Google again, choose a role, and restart the app. The selected role will be reused and the picker will not appear again.

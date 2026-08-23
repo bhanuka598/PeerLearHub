@@ -86,11 +86,12 @@ app.post('/api/auth/verify-token', async (req, res) => {
       .doc(decodedToken.uid)
       .get();
     const savedRole = userSnapshot.data()?.role;
+    const claimRole = ['teacher', 'admin'].includes(decodedToken.role)
+      ? decodedToken.role
+      : null;
     const role = ['student', 'teacher', 'admin'].includes(savedRole)
       ? savedRole
-      : ['student', 'teacher', 'admin'].includes(decodedToken.role)
-        ? decodedToken.role
-        : null;
+      : claimRole;
 
     return res.json({
       success: true,

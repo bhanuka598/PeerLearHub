@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "set-role": "node scripts/set-user-role.js"
+    "set-role": "node scripts/set-user-role.js",
+    "reset-role": "node scripts/reset-user-role.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
