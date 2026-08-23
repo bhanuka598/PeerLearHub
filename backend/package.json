@@ -1,0 +1,19 @@
+{
+  "name": "peer-learn-hub-backend",
+  "version": "1.0.0",
+  "description": "Express API for PeerLearnHub Firebase authentication and backend verification",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "set-role": "node scripts/set-user-role.js",
+    "reset-role": "node scripts/reset-user-role.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "firebase-admin": "^12.5.0"
+  }
+}
