@@ -7,9 +7,13 @@ import 'package:peer_learn_hub/firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on UnsupportedError catch (_) {
+    // The UI can run while platform-specific Firebase configuration is added.
+  }
 
   runApp(const PeerLearnHub());
 }

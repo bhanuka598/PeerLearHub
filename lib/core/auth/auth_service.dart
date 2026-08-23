@@ -11,17 +11,30 @@ class AuthService {
 
   static final AuthService instance = AuthService._();
 
-  static const String _defaultBackendUrl = 'http://localhost:4000';
+  static const String _defaultBackendUrl = String.fromEnvironment(
+    'BACKEND_URL',
+    defaultValue: 'http://localhost:4000',
+  );
   static const String _googleServerClientId =
       '536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com';
 
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: _googleServerClientId,
   );
   String? _lastError;
+  String? _authenticatedRole;
 
   String? get lastError => _lastError;
+  String? get authenticatedRole => _authenticatedRole;
+
+  FirebaseAuth? get _firebaseAuth {
+    try {
+      return FirebaseAuth.instance;
+    } on Object catch (error) {
+      debugPrint('Firebase Auth is not initialized: $error');
+      return null;
+    }
+  }
 
   static String get backendBaseUrl {
     if (kIsWeb) {
@@ -57,35 +70,53 @@ class AuthService {
 
   Future<bool> signInWithGoogle() async {
     _lastError = null;
+    _authenticatedRole = null;
     try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        _lastError = 'Google sign-in was cancelled.';
+      final firebaseAuth = _firebaseAuth;
+      if (firebaseAuth == null) {
+        _lastError =
+            'Firebase Web is not configured. Run flutterfire configure '
+            'with the web platform enabled.';
         return false;
       }
 
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+      final UserCredential userCredential;
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider();
+        userCredential = await firebaseAuth.signInWithPopup(provider);
+      } else {
+        final googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) {
+          _lastError = 'Google sign-in was cancelled.';
+          return false;
+        }
 
-      final userCredential = await _firebaseAuth.signInWithCredential(
-        credential,
-      );
+        final googleAuth = await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        userCredential = await firebaseAuth.signInWithCredential(credential);
+      }
       final firebaseIdToken = await userCredential.user?.getIdToken();
 
       if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
-        await _firebaseAuth.signOut();
+        await firebaseAuth.signOut();
         _lastError = 'Firebase did not return an ID token.';
         return false;
       }
 
       try {
-        await verifyTokenWithBackend(firebaseIdToken);
-      } catch (_) {
-        // The backend may not be running yet during local development.
-        // Firebase sign-in still succeeds and the app remains usable.
+        final backendUser = await verifyTokenWithBackend(firebaseIdToken);
+        _authenticatedRole = backendUser['role'] as String? ?? 'student';
+      } on Exception catch (error) {
+        await firebaseAuth.signOut();
+        _lastError =
+            'Backend connection failed. Start the API at '
+            '$backendBaseUrl. ($error)';
+        debugPrint('PeerLearnHub backend verification failed: $error');
+        return false;
       }
 
       return true;
@@ -96,7 +127,15 @@ class AuthService {
       );
       return false;
     } on Exception catch (error) {
-      _lastError = 'Google sign-in failed: $error';
+      final errorText = error.toString();
+      if (errorText.contains('network_error') ||
+          errorText.contains('ApiException: 7')) {
+        _lastError =
+            'Google sign-in needs an internet connection. Check the '
+            'emulator network and try again.';
+      } else {
+        _lastError = 'Google sign-in failed: $error';
+      }
       debugPrint('Google sign-in failed: $error');
       return false;
     }
