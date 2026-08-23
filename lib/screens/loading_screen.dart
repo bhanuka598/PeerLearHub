@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/auth/app_auth.dart';
 import '../core/theme/app_theme.dart';
 
 class LoadingScreen extends StatelessWidget {
@@ -149,35 +148,6 @@ class LoadingScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _RoleDemoButton(
-                      label: 'Student',
-                      onPressed: () {
-                        AppAuth.instance.setRole(AppUserRole.student);
-                        context.go(AppAuth.instance.getHomeRoute());
-                      },
-                    ),
-                    _RoleDemoButton(
-                      label: 'Teacher',
-                      onPressed: () {
-                        AppAuth.instance.setRole(AppUserRole.teacher);
-                        context.go(AppAuth.instance.getHomeRoute());
-                      },
-                    ),
-                    _RoleDemoButton(
-                      label: 'Admin',
-                      onPressed: () {
-                        AppAuth.instance.setRole(AppUserRole.admin);
-                        context.go(AppAuth.instance.getHomeRoute());
-                      },
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -242,25 +212,6 @@ class _FeatureCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _RoleDemoButton extends StatelessWidget {
-  const _RoleDemoButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton.tonal(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(label),
     );
   }
 }
