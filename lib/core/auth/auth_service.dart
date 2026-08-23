@@ -135,7 +135,7 @@ class AuthService {
 
       try {
         final backendUser = await verifyTokenWithBackend(firebaseIdToken);
-        _authenticatedRole = backendUser['role'] as String? ?? 'student';
+        _authenticatedRole = backendUser['role'] as String?;
       } on Exception catch (error) {
         await firebaseAuth.signOut();
         _lastError =

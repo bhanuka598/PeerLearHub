@@ -14,6 +14,7 @@ import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
 import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
 import 'package:peer_learn_hub/screens/register_screen.dart';
+import 'package:peer_learn_hub/screens/role_selection_screen.dart';
 
 class RouterClass {
   static final GoRouter router = GoRouter(
@@ -43,6 +44,10 @@ class RouterClass {
       GoRoute(
         path: '/otp-verification',
         builder: (context, state) => const OtpVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/select-role',
+        builder: (context, state) => const RoleSelectionScreen(),
       ),
       GoRoute(
         path: '/skill-exchange',

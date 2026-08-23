@@ -73,6 +73,7 @@ class AppAuth {
       '/register',
       '/forgot-password',
       '/otp-verification',
+      '/select-role',
     ];
     if (allowedForGuest.contains(cleanLocation)) {
       return true;
