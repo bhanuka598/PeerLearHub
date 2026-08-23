@@ -68,6 +68,32 @@ class AuthService {
     return Map<String, dynamic>.from(payload['user'] as Map);
   }
 
+  Future<String?> saveRole(String role) async {
+    final firebaseAuth = _firebaseAuth;
+    final token = await firebaseAuth?.currentUser?.getIdToken(true);
+    if (firebaseAuth == null || token == null) {
+      _lastError = 'Firebase authentication is not available.';
+      return null;
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/role'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'role': role}),
+    );
+    final payload = jsonDecode(response.body);
+    if ((response.statusCode != 200 && response.statusCode != 201) ||
+        payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Unable to save account role.');
+    }
+
+    _authenticatedRole = payload['role'] as String?;
+    return _authenticatedRole;
+  }
+
   Future<bool> signInWithGoogle() async {
     _lastError = null;
     _authenticatedRole = null;

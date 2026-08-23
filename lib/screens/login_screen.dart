@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/app_auth.dart';
 import '../core/auth/auth_service.dart';
 import '../core/theme/app_theme.dart';
+import '../widgets/google_role_picker.dart';
 import '../widgets/social_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -88,6 +89,20 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (success) {
+        if (AppAuth.instance.currentRole == null) {
+          final selectedRole = await GoogleRolePicker.show(context);
+          if (!mounted) {
+            return;
+          }
+          if (selectedRole == null ||
+              !await AppAuth.instance.saveGoogleRole(selectedRole)) {
+            _showError('Unable to save your selected role. Please try again.');
+            return;
+          }
+          if (!mounted) {
+            return;
+          }
+        }
         context.go(AppAuth.instance.getHomeRoute());
       } else {
         _showError(

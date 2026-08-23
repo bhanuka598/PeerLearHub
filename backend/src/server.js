@@ -2,8 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
+import path from 'node:path';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import { cert } from 'firebase-admin/app';
 
 dotenv.config();
@@ -21,9 +23,9 @@ function initializeFirebaseAdmin() {
 
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
   if (serviceAccountPath) {
-    const resolvedPath = serviceAccountPath.startsWith('.')
-      ? new URL(serviceAccountPath, `file://${process.cwd()}/`).pathname
-      : serviceAccountPath;
+    const resolvedPath = path.isAbsolute(serviceAccountPath)
+      ? serviceAccountPath
+      : path.resolve(process.cwd(), serviceAccountPath);
 
     if (fs.existsSync(resolvedPath)) {
       const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
@@ -35,9 +37,26 @@ function initializeFirebaseAdmin() {
     }
   }
 
-  initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-  });
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+
+  if (privateKey && clientEmail && projectId) {
+    initializeApp({
+      credential: cert({
+        projectId,
+        privateKey,
+        clientEmail,
+      }),
+      projectId,
+    });
+    return;
+  }
+
+  throw new Error(
+    'Firebase Admin credentials are missing. Set FIREBASE_SERVICE_ACCOUNT_PATH '
+      + 'or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.',
+  );
 }
 
 initializeFirebaseAdmin();
@@ -62,6 +81,16 @@ app.post('/api/auth/verify-token', async (req, res) => {
     }
 
     const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userSnapshot = await getFirestore()
+      .collection('users')
+      .doc(decodedToken.uid)
+      .get();
+    const savedRole = userSnapshot.data()?.role;
+    const role = ['student', 'teacher', 'admin'].includes(savedRole)
+      ? savedRole
+      : ['student', 'teacher', 'admin'].includes(decodedToken.role)
+        ? decodedToken.role
+        : null;
 
     return res.json({
       success: true,
@@ -71,13 +100,76 @@ app.post('/api/auth/verify-token', async (req, res) => {
         name: decodedToken.name ?? null,
         picture: decodedToken.picture ?? null,
         provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
+        role,
       },
     });
   } catch (error) {
-    console.error('Firebase token verification failed:', error);
+    if (
+      error?.code === 'auth/argument-error' ||
+      error?.code === 'auth/id-token-expired' ||
+      error?.code === 'auth/invalid-id-token'
+    ) {
+      console.warn(`Firebase token rejected (${error.code}).`);
+    } else {
+      console.error('Firebase token verification failed:', error);
+    }
     return res.status(401).json({
       success: false,
       message: 'Invalid or expired Firebase token.',
+    });
+  }
+});
+
+app.post('/api/auth/role', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization ?? '';
+    const idToken = authorization.startsWith('Bearer ')
+      ? authorization.substring('Bearer '.length)
+      : '';
+    const { role } = req.body ?? {};
+
+    if (!idToken || !['student', 'teacher', 'admin'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid Firebase token and role are required.',
+      });
+    }
+
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userReference = getFirestore()
+      .collection('users')
+      .doc(decodedToken.uid);
+    const result = await getFirestore().runTransaction(async (transaction) => {
+      const savedUser = await transaction.get(userReference);
+      const existingRole = savedUser.data()?.role;
+      if (savedUser.exists && existingRole) {
+        return { role: existingRole, created: false };
+      }
+
+      transaction.set(
+        userReference,
+        {
+          uid: decodedToken.uid,
+          email: decodedToken.email ?? null,
+          displayName: decodedToken.name ?? null,
+          role,
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      return { role, created: true };
+    });
+
+    return res.status(result.created ? 201 : 200).json({
+      success: true,
+      role: result.role,
+      locked: true,
+    });
+  } catch (error) {
+    console.error('Role persistence failed:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Unable to save the account role.',
     });
   }
 });

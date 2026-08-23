@@ -26,3 +26,14 @@ Expected request body:
 ## Notes
 
 The Flutter app sends the Firebase Google ID token after the Google sign-in step. The backend verifies it with Firebase Admin before accepting the user session.
+
+## Test teacher and admin accounts
+
+Google accounts are students by default. Assign a Firebase custom claim from the backend folder:
+
+```bash
+npm run set-role -- user@example.com teacher
+npm run set-role -- user@example.com admin
+```
+
+The account must sign out and sign in again after changing its role. The backend only accepts `student`, `teacher`, and `admin`; unknown or missing claims fall back to `student`.

@@ -18,9 +18,33 @@ class AppAuth {
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      setRole(AppUserRole.student);
+      final role = AuthService.instance.authenticatedRole;
+      if (role != null) {
+        setRole(_roleFromName(role));
+      }
     }
     return signedIn;
+  }
+
+  Future<bool> saveGoogleRole(AppUserRole role) async {
+    try {
+      final savedRole = await AuthService.instance.saveRole(role.name);
+      if (savedRole == null) {
+        return false;
+      }
+      setRole(_roleFromName(savedRole));
+      return true;
+    } on Exception {
+      return false;
+    }
+  }
+
+  AppUserRole _roleFromName(String role) {
+    return switch (role) {
+      'teacher' => AppUserRole.teacher,
+      'admin' => AppUserRole.admin,
+      _ => AppUserRole.student,
+    };
   }
 
   void logout() {
