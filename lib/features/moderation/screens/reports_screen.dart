@@ -75,7 +75,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
+                  child: ChoiceChip(
                     label: Text(filter),
                     selected: isSelected,
                     onSelected: (selected) {
@@ -88,11 +88,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     labelStyle: TextStyle(
                       color: isSelected ? AppColors.primaryTeal : Colors.white,
                       fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
-                    checkmarkColor: AppColors.primaryTeal,
                     side: BorderSide(
                       color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
                     ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 );
               },
