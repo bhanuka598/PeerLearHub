@@ -25,14 +25,14 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: () {
-                  // Navigate to the Skill Exchange Dashboard
-                  context.go('/skill-exchange');
+                  // Perform login action, navigate to home
+                  context.go('/');
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF0F766E),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                 ),
-                child: const Text('Login to Skill Exchange Hub', style: TextStyle(fontSize: 16)),
+                child: const Text('Login', style: TextStyle(fontSize: 16)),
               ),
               const SizedBox(height: 12),
               TextButton.icon(
