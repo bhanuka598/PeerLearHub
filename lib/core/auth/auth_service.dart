@@ -19,10 +19,9 @@ class AuthService {
   static const String _googleServerClientId =
       '536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com';
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: _googleServerClientId,
-    clientId: kIsWeb ? _googleServerClientId : null,
-  );
+  final GoogleSignIn _googleSignIn = kIsWeb
+      ? GoogleSignIn(clientId: _googleServerClientId)
+      : GoogleSignIn(serverClientId: _googleServerClientId);
   String? _lastError;
 
   String? get lastError => _lastError;

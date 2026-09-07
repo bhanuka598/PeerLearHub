@@ -83,6 +83,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             const RoleSwitcherButton(onDark: true),
             IconButton(
               onPressed: () {
+                context.go('/profile');
+              },
+              icon: const Icon(Icons.person),
+              tooltip: 'Profile',
+            ),
+            IconButton(
+              onPressed: () {
                 AppAuth.instance.logout();
                 context.go('/');
               },

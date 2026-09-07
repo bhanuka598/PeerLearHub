@@ -15,6 +15,7 @@ import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
 import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
+import 'package:peer_learn_hub/screens/profile_screen.dart';
 import 'package:peer_learn_hub/screens/register_screen.dart';
 
 class RouterClass {
@@ -97,6 +98,10 @@ class RouterClass {
               ? AssignmentScreen(course: course)
               : const MyLearningScreen();
         },
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/skill-provider',

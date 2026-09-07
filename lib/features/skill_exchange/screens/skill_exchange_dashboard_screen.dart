@@ -128,6 +128,13 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
             ],
           ),
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              context.go('/profile');
+            },
+            tooltip: 'Profile',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               AppAuth.instance.logout();
