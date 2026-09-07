@@ -134,6 +134,40 @@ class AuthService {
     await _googleSignIn.signOut();
   }
 
+  Future<void> requestPasswordResetCode(String email) async {
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/password-reset/request'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(
+        payload['message'] ?? 'Unable to send verification code.',
+      );
+    }
+  }
+
+  Future<void> verifyPasswordResetCode({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/password-reset/verify'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email.trim().toLowerCase(),
+        'otp': otp,
+        'newPassword': newPassword,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Unable to reset password.');
+    }
+  }
+
   String authErrorMessage(FirebaseAuthException error) {
     switch (error.code) {
       case 'email-already-in-use':

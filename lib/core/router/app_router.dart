@@ -43,7 +43,10 @@ class RouterClass {
       ),
       GoRoute(
         path: '/otp-verification',
-        builder: (context, state) => const OtpVerificationScreen(),
+        builder: (context, state) => OtpVerificationScreen(
+          email: state.uri.queryParameters['email'],
+          isPasswordReset: state.uri.queryParameters['mode'] == 'reset',
+        ),
       ),
       GoRoute(
         path: '/skill-exchange',
