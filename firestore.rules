@@ -5,6 +5,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, create, update: if request.auth != null
         && request.auth.uid == userId;
+
+      match /enrollments/{courseId} {
+        allow read, create, update: if request.auth != null
+          && request.auth.uid == userId;
+      }
     }
   }
 }

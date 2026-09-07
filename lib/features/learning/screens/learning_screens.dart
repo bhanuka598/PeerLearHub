@@ -27,6 +27,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    LearningStore.instance.loadEnrollments();
+  }
+
+  @override
   Widget build(BuildContext context) =>
       ValueListenableBuilder<List<LearningCourse>>(
         valueListenable: LearningStore.instance,
@@ -177,8 +183,11 @@ class CourseDetailsScreen extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: FilledButton(
-          onPressed: () {
-            LearningStore.instance.enroll(course);
+          onPressed: () async {
+            await LearningStore.instance.enroll(course);
+            if (!context.mounted) {
+              return;
+            }
             context.go('/learning/my-courses');
           },
           child: Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
@@ -335,11 +344,14 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: FilledButton(
-            onPressed: () {
-              LearningStore.instance.updateProgress(
+            onPressed: () async {
+              await LearningStore.instance.updateProgress(
                 widget.course,
                 widget.course.progress + 5,
               );
+              if (!context.mounted) {
+                return;
+              }
               context.go('/learning/my-courses');
             },
             child: const Text('Mark lesson complete'),
