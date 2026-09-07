@@ -3,6 +3,7 @@ import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/features/moderation/screens/moderator_dashboard_screen.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_course.dart';
 import 'package:peer_learn_hub/features/learning/screens/learning_screens.dart';
+import 'package:peer_learn_hub/features/learning/models/learning_quiz.dart';
 import 'package:peer_learn_hub/features/skill_exchange/skill_exchange.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/create_lesson_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/edit_lesson_screen.dart';
@@ -75,6 +76,15 @@ class RouterClass {
           final course = state.extra;
           return course is LearningCourse
               ? LessonViewScreen(course: course)
+              : const MyLearningScreen();
+        },
+      ),
+      GoRoute(
+        path: '/learning/quiz',
+        builder: (context, state) {
+          final quiz = state.extra;
+          return quiz is LearningQuiz
+              ? QuizScreen(quiz: quiz)
               : const MyLearningScreen();
         },
       ),

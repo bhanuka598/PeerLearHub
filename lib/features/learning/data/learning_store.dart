@@ -7,6 +7,9 @@ import '../models/learning_course.dart';
 class LearningStore extends ValueNotifier<List<LearningCourse>> {
   LearningStore._() : super(_courses);
   static final instance = LearningStore._();
+  int _points = 0;
+
+  int get points => _points;
 
   Future<void> loadEnrollments() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -49,6 +52,38 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
     );
     _replace(updated);
     await _saveEnrollment(updated);
+  }
+
+  Future<int> saveQuizPoints({
+    required LearningCourse course,
+    required String moduleId,
+    required int points,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    _points += points;
+    notifyListeners();
+    if (user == null) {
+      return _points;
+    }
+
+    try {
+      final userReference = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      await userReference.set({
+        'learningPoints': FieldValue.increment(points),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await userReference.collection('enrollments').doc(course.id).set({
+        'courseId': course.id,
+        'lastQuizModuleId': moduleId,
+        'lastQuizPoints': points,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (error) {
+      debugPrint('Could not save quiz points: ${error.code}');
+    }
+    return _points;
   }
 
   Future<void> _saveEnrollment(LearningCourse course) async {

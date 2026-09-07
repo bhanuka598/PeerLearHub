@@ -5,7 +5,9 @@ import '../../../core/auth/app_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/role_switcher_button.dart';
 import '../data/learning_store.dart';
+import '../data/learning_quiz_data.dart';
 import '../models/learning_course.dart';
+import '../models/learning_quiz.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -418,11 +420,170 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               if (!context.mounted) {
                 return;
               }
-              context.go('/learning/my-courses');
+              context.push(
+                '/learning/quiz',
+                extra: quizForModule(widget.course, 2),
+              );
             },
-            child: const Text('Mark lesson complete'),
+            child: const Text('Complete lesson and take quiz'),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class QuizScreen extends StatefulWidget {
+  const QuizScreen({super.key, required this.quiz});
+
+  final LearningQuiz quiz;
+
+  @override
+  State<QuizScreen> createState() => _QuizScreenState();
+}
+
+class _QuizScreenState extends State<QuizScreen> {
+  int _questionIndex = 0;
+  int _attemptsForQuestion = 0;
+  int _score = 0;
+  int? _selectedIndex;
+  bool _checking = false;
+
+  QuizQuestion get _question => widget.quiz.questions[_questionIndex];
+
+  Future<void> _submitAnswer() async {
+    final selected = _selectedIndex;
+    if (selected == null || _checking) {
+      return;
+    }
+
+    setState(() => _checking = true);
+    final correct = selected == _question.correctIndex;
+    if (!correct) {
+      setState(() {
+        _attemptsForQuestion++;
+        _selectedIndex = null;
+        _checking = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not quite. Try this question again.')),
+      );
+      return;
+    }
+
+    final earned = _attemptsForQuestion == 0 ? 5 : 3;
+    final newScore = _score + earned;
+    if (_questionIndex < widget.quiz.questions.length - 1) {
+      setState(() {
+        _score = newScore;
+        _questionIndex++;
+        _attemptsForQuestion = 0;
+        _selectedIndex = null;
+        _checking = false;
+      });
+      return;
+    }
+
+    final total = await LearningStore.instance.saveQuizPoints(
+      course: _courseForQuiz,
+      moduleId: widget.quiz.moduleId,
+      points: newScore,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _score = newScore;
+      _checking = false;
+    });
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Quiz complete!'),
+        content: Text(
+          'You earned $newScore points. Your total is $total points.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/learning/my-courses');
+            },
+            child: const Text('Back to My Courses'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  LearningCourse get _courseForQuiz => LearningStore.instance.value.firstWhere(
+    (course) => course.id == widget.quiz.courseId,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (_questionIndex + 1) / widget.quiz.questions.length;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.quiz.moduleTitle} Quiz'),
+        actions: const [RoleSwitcherButton()],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          LinearProgressIndicator(
+            value: progress,
+            color: AppTheme.primaryColor,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Question ${_questionIndex + 1} of ${widget.quiz.questions.length}',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _question.question,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          for (var i = 0; i < _question.options.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: RadioListTile<int>(
+                value: i,
+                groupValue: _selectedIndex,
+                onChanged: _checking
+                    ? null
+                    : (value) => setState(() => _selectedIndex = value),
+                title: Text(_question.options[i]),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                tileColor: _selectedIndex == i
+                    ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                    : null,
+              ),
+            ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: _selectedIndex == null || _checking
+                ? null
+                : _submitAnswer,
+            child: Text(
+              _questionIndex == widget.quiz.questions.length - 1
+                  ? 'Finish Quiz'
+                  : 'Check Answer',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(child: Text('Quiz points: $_score')),
+        ],
       ),
     );
   }
