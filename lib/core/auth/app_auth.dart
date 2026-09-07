@@ -33,6 +33,7 @@ class AppAuth extends ChangeNotifier {
 
   void logout() {
     _currentRole = null;
+    AuthService.instance.signOut();
     notifyListeners();
   }
 

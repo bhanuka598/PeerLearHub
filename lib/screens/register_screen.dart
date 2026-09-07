@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
@@ -84,9 +85,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  void _showError(String message) {
+  void _showError(
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+        action: actionLabel == null || onAction == null
+            ? null
+            : SnackBarAction(
+                label: actionLabel,
+                textColor: Colors.white,
+                onPressed: onAction,
+              ),
+      ),
     );
   }
 
@@ -101,15 +116,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-
-    if (!mounted) {
-      return;
+    try {
+      await AuthService.instance.registerWithEmail(
+        fullName: _fullNameController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        learningGoal: _selectedGoal,
+      );
+      if (!mounted) {
+        return;
+      }
+      AppAuth.instance.setRole(AppUserRole.student);
+      context.go(AppAuth.instance.getHomeRoute());
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        _showError(
+          AuthService.instance.authErrorMessage(error),
+          actionLabel: error.code == 'email-already-in-use' ? 'Log in' : null,
+          onAction: error.code == 'email-already-in-use'
+              ? () => context.go('/login')
+              : null,
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        _showError(error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
-
-    AppAuth.instance.setRole(AppUserRole.student);
-    setState(() => _isSubmitting = false);
-    context.go('/otp-verification');
   }
 
   Future<void> _signInWithGoogle() async {

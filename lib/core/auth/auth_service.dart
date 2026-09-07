@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -25,6 +26,16 @@ class AuthService {
 
   String? get lastError => _lastError;
 
+  FirebaseAuth get _requiredFirebaseAuth {
+    final firebaseAuth = _firebaseAuth;
+    if (firebaseAuth == null) {
+      throw StateError(
+        'Firebase Auth is not initialized. Check the Firebase configuration.',
+      );
+    }
+    return firebaseAuth;
+  }
+
   FirebaseAuth? get _firebaseAuth {
     try {
       return FirebaseAuth.instance;
@@ -48,6 +59,100 @@ class AuthService {
     }
 
     return _defaultBackendUrl;
+  }
+
+  Future<UserCredential> registerWithEmail({
+    required String fullName,
+    required String email,
+    required String password,
+    required String learningGoal,
+  }) async {
+    _lastError = null;
+    final credential = await _requiredFirebaseAuth
+        .createUserWithEmailAndPassword(
+          email: email.trim().toLowerCase(),
+          password: password,
+        );
+    final user = credential.user;
+    if (user == null) {
+      throw StateError('Firebase did not return the newly created user.');
+    }
+
+    await user.updateDisplayName(fullName.trim());
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'fullName': fullName.trim(),
+        'email': user.email,
+        'learningGoal': learningGoal,
+        'role': 'student',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') {
+        rethrow;
+      }
+      debugPrint('User profile was not saved: Firestore permissions denied.');
+    }
+    return credential;
+  }
+
+  Future<UserCredential> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    _lastError = null;
+    final credential = await _requiredFirebaseAuth.signInWithEmailAndPassword(
+      email: email.trim().toLowerCase(),
+      password: password,
+    );
+    final user = credential.user;
+    if (user != null) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email,
+          'lastLoginAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } on FirebaseException catch (error) {
+        if (error.code != 'permission-denied') {
+          rethrow;
+        }
+        debugPrint(
+          'Login succeeded, but the profile timestamp was not saved: '
+          'Firestore permissions denied.',
+        );
+      }
+    }
+    return credential;
+  }
+
+  Future<void> signOut() async {
+    await _firebaseAuth?.signOut();
+    await _googleSignIn.signOut();
+  }
+
+  String authErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'An account already exists for this email address.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'weak-password':
+        return 'Choose a stronger password with at least 6 characters.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Incorrect email or password.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      default:
+        return error.message ?? 'Authentication failed. Please try again.';
+    }
   }
 
   Future<Map<String, dynamic>> verifyTokenWithBackend(String idToken) async {
