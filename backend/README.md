@@ -27,21 +27,8 @@ Expected request body:
 
 The Flutter app sends the Firebase Google ID token after the Google sign-in step. The backend verifies it with Firebase Admin before accepting the user session.
 
-## Test teacher and admin accounts
+## Role switching
 
-Google accounts are students by default. Assign a Firebase custom claim from the backend folder:
+Roles are session-level UI state in the Flutter app and are not stored as Firebase custom claims. After signing in, use the role switcher in the app bar or dashboard header to move between Student and Teacher mode.
 
-```bash
-npm run set-role -- user@example.com teacher
-npm run set-role -- user@example.com admin
-```
-
-The account must sign out and sign in again after changing its role. The backend only accepts `student`, `teacher`, and `admin`; unknown or missing claims fall back to `student`.
-
-To test the first-login role picker again for an existing account, reset it locally from the backend folder:
-
-```bash
-npm run reset-role -- user@example.com
-```
-
-Then sign out, sign in with Google again, choose a role, and restart the app. The selected role will be reused and the picker will not appear again.
+Both modes can learn courses and create courses. Completing a course does not permanently change the account role; a student can switch to Teacher mode whenever they are ready to teach, and a teacher can switch back to Student mode to learn.

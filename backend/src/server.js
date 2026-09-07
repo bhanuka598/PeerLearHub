@@ -81,17 +81,6 @@ app.post('/api/auth/verify-token', async (req, res) => {
     }
 
     const decodedToken = await getAuth().verifyIdToken(idToken);
-    const userSnapshot = await getFirestore()
-      .collection('users')
-      .doc(decodedToken.uid)
-      .get();
-    const savedRole = userSnapshot.data()?.role;
-    const claimRole = ['teacher', 'admin'].includes(decodedToken.role)
-      ? decodedToken.role
-      : null;
-    const role = ['student', 'teacher', 'admin'].includes(savedRole)
-      ? savedRole
-      : claimRole;
 
     return res.json({
       success: true,
@@ -101,7 +90,6 @@ app.post('/api/auth/verify-token', async (req, res) => {
         name: decodedToken.name ?? null,
         picture: decodedToken.picture ?? null,
         provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
-        role,
       },
     });
   } catch (error) {
@@ -117,60 +105,6 @@ app.post('/api/auth/verify-token', async (req, res) => {
     return res.status(401).json({
       success: false,
       message: 'Invalid or expired Firebase token.',
-    });
-  }
-});
-
-app.post('/api/auth/role', async (req, res) => {
-  try {
-    const authorization = req.headers.authorization ?? '';
-    const idToken = authorization.startsWith('Bearer ')
-      ? authorization.substring('Bearer '.length)
-      : '';
-    const { role } = req.body ?? {};
-
-    if (!idToken || !['student', 'teacher', 'admin'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'A valid Firebase token and role are required.',
-      });
-    }
-
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    const userReference = getFirestore()
-      .collection('users')
-      .doc(decodedToken.uid);
-    const result = await getFirestore().runTransaction(async (transaction) => {
-      const savedUser = await transaction.get(userReference);
-      const existingRole = savedUser.data()?.role;
-      if (savedUser.exists && existingRole) {
-        return { role: existingRole, created: false };
-      }
-
-      transaction.set(
-        userReference,
-        {
-          uid: decodedToken.uid,
-          email: decodedToken.email ?? null,
-          displayName: decodedToken.name ?? null,
-          role,
-          createdAt: new Date().toISOString(),
-        },
-        { merge: true },
-      );
-      return { role, created: true };
-    });
-
-    return res.status(result.created ? 201 : 200).json({
-      success: true,
-      role: result.role,
-      locked: true,
-    });
-  } catch (error) {
-    console.error('Role persistence failed:', error);
-    return res.status(401).json({
-      success: false,
-      message: 'Unable to save the account role.',
     });
   }
 });
