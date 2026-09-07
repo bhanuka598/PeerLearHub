@@ -8,8 +8,12 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
   LearningStore._() : super(_courses);
   static final instance = LearningStore._();
   int _points = 0;
+  final _completedQuizCourses = <String>{};
 
   int get points => _points;
+
+  bool canSubmitAssignment(LearningCourse course) =>
+      course.progress >= 100 && _completedQuizCourses.contains(course.id);
 
   Future<void> loadEnrollments() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -24,16 +28,20 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
           .collection('enrollments')
           .get();
       final saved = {
-        for (final document in snapshot.docs)
-          document.id: document.data()['progress'] as int? ?? 0,
+        for (final document in snapshot.docs) document.id: document.data(),
       };
       value = [
         for (final course in value)
           course.copyWith(
             enrolled: saved.containsKey(course.id),
-            progress: saved[course.id] ?? 0,
+            progress: saved[course.id]?['progress'] as int? ?? 0,
           ),
       ];
+      for (final entry in saved.entries) {
+        if (entry.value['quizCompleted'] == true) {
+          _completedQuizCourses.add(entry.key);
+        }
+      }
     } on FirebaseException catch (error) {
       debugPrint('Could not load enrollments: ${error.code}');
     }
@@ -78,8 +86,10 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
         'courseId': course.id,
         'lastQuizModuleId': moduleId,
         'lastQuizPoints': points,
+        'quizCompleted': true,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      _completedQuizCourses.add(course.id);
     } on FirebaseException catch (error) {
       debugPrint('Could not save quiz points: ${error.code}');
     }

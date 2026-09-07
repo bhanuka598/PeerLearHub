@@ -21,6 +21,7 @@ class AuthService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: _googleServerClientId,
+    clientId: kIsWeb ? _googleServerClientId : null,
   );
   String? _lastError;
 

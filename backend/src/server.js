@@ -16,7 +16,14 @@ const app = express();
 const port = Number(process.env.PORT || 4000);
 const otpStore = new Map();
 
-app.use(cors({ origin: true, credentials: true }));
+// Configure CORS to allow requests from Flutter web
+app.use(cors({
+  origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: '2mb' }));
 
 function initializeFirebaseAdmin() {
@@ -192,6 +199,57 @@ app.post('/api/auth/password-reset/verify', async (req, res) => {
   } catch (error) {
     console.error('Password reset verification failed:', error);
     return res.status(500).json({ success: false, message: 'Unable to reset the password.' });
+  }
+});
+
+// Assignment submission endpoint
+app.post('/api/assignments/submit', async (req, res) => {
+  try {
+    const { idToken, courseId, description, githubUrl } = req.body;
+    
+    if (!idToken) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    // Verify Firebase token
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userId = decodedToken.uid;
+
+    if (!courseId || !description || !githubUrl) {
+      return res.status(400).json({ success: false, message: 'Missing required fields.' });
+    }
+
+    // Validate GitHub URL
+    try {
+      const githubUrlObj = new URL(githubUrl.trim());
+      if (!githubUrlObj.hostname.includes('github.com')) {
+        return res.status(400).json({ success: false, message: 'Invalid GitHub URL.' });
+      }
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid GitHub URL format.' });
+    }
+
+    // Save assignment data to Firestore (without file)
+    const db = getFirestore();
+    await db.collection('users').doc(userId).collection('assignments').doc(courseId).set({
+      courseId,
+      description: description.trim(),
+      githubUrl: githubUrl.trim(),
+      status: 'submitted',
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    return res.json({ 
+      success: true, 
+      message: 'Assignment submitted successfully'
+    });
+  } catch (error) {
+    console.error('Assignment submission failed:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Assignment submission failed.' 
+    });
   }
 });
 

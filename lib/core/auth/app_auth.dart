@@ -71,6 +71,7 @@ class AppAuth extends ChangeNotifier {
             cleanLocation == '/learning/course' ||
             cleanLocation == '/learning/lesson' ||
             cleanLocation == '/learning/quiz' ||
+            cleanLocation == '/learning/assignment' ||
             cleanLocation == '/skill-exchange' ||
             cleanLocation == '/skill-provider' ||
             cleanLocation == '/skill-provider/my-lessons' ||
@@ -82,6 +83,7 @@ class AppAuth extends ChangeNotifier {
             cleanLocation == '/learning/course' ||
             cleanLocation == '/learning/lesson' ||
             cleanLocation == '/learning/quiz' ||
+            cleanLocation == '/learning/assignment' ||
             cleanLocation == '/skill-exchange' ||
             cleanLocation == '/skill-provider' ||
             cleanLocation == '/skill-provider/my-lessons' ||

@@ -290,11 +290,31 @@ class MyLearningScreen extends StatelessWidget {
                   ),
                 ),
               ...enrolled.map(
-                (course) => LearningCourseCard(
-                  course: course,
-                  onContinue: () =>
-                      context.push('/learning/lesson', extra: course),
-                  onTap: () => context.push('/learning/course', extra: course),
+                (course) => Column(
+                  children: [
+                    LearningCourseCard(
+                      course: course,
+                      onContinue: () =>
+                          context.push('/learning/lesson', extra: course),
+                      onTap: () =>
+                          context.push('/learning/course', extra: course),
+                    ),
+                    if (LearningStore.instance.canSubmitAssignment(course))
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: OutlinedButton.icon(
+                            onPressed: () => context.push(
+                              '/learning/assignment',
+                              extra: course,
+                            ),
+                            icon: const Icon(Icons.assignment_outlined),
+                            label: const Text('Submit assignment'),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
