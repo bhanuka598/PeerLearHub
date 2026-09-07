@@ -15,7 +15,9 @@ class DiscoverScreen extends StatefulWidget {
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
   String _category = 'All';
+  String _level = 'All Levels';
   String _query = '';
+  final _searchController = TextEditingController();
   static const _categories = [
     'All',
     'Mobile',
@@ -26,6 +28,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     'Database',
   ];
 
+  static const _levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
+
   @override
   void initState() {
     super.initState();
@@ -33,109 +37,171 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ValueListenableBuilder<List<LearningCourse>>(
-        valueListenable: LearningStore.instance,
-        builder: (context, courses, _) {
-          final visible = courses
-              .where(
-                (course) =>
-                    (_category == 'All' || course.category == _category) &&
-                    ('${course.title} ${course.category} ${course.instructor}'
-                        .toLowerCase()
-                        .contains(_query.toLowerCase())),
-              )
-              .toList();
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('PeerLearnHub'),
-              actions: [
-                const RoleSwitcherButton(onDark: true),
-                IconButton(
-                  onPressed: () {
-                    AppAuth.instance.logout();
-                    context.go('/');
-                  },
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Logout',
-                ),
-              ],
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSearch(LearningCourse course) {
+    final searchableText = [
+      course.title,
+      course.description,
+      course.category,
+      course.level,
+      course.instructor,
+      ...course.modules.map((module) => module.title),
+    ].join(' ').toLowerCase();
+    final terms = _query
+        .trim()
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((term) => term.isNotEmpty);
+
+    return terms.every(searchableText.contains);
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => ValueListenableBuilder<List<LearningCourse>>(
+    valueListenable: LearningStore.instance,
+    builder: (context, courses, _) {
+      final visible = courses
+          .where(
+            (course) =>
+                (_category == 'All' || course.category == _category) &&
+                (_level == 'All Levels' || course.level == _level) &&
+                _matchesSearch(course),
+          )
+          .toList();
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('PeerLearnHub'),
+          actions: [
+            const RoleSwitcherButton(onDark: true),
+            IconButton(
+              onPressed: () {
+                AppAuth.instance.logout();
+                context.go('/');
+              },
+              icon: const Icon(Icons.logout),
+              tooltip: 'Logout',
             ),
-            body: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                children: [
-                  Text(
-                    'Find Your Next Skill',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    onChanged: (value) => setState(() => _query = value),
-                    decoration: const InputDecoration(
+          ],
+        ),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+            children: [
+              Text(
+                'Find Your Next Skill',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                onChanged: (value) => setState(() => _query = value),
+                onSubmitted: (value) => setState(() => _query = value),
+                decoration:
+                    const InputDecoration(
                       hintText: 'Search for courses, skills, topics...',
                       prefixIcon: Icon(Icons.search),
+                    ).copyWith(
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                            ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Explore Categories',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 42,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        return ChoiceChip(
-                          label: Text(category),
-                          selected: _category == category,
-                          selectedColor: AppTheme.primaryColor.withValues(
-                            alpha: .18,
-                          ),
-                          onSelected: (_) =>
-                              setState(() => _category = category),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Popular courses',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (visible.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text('No courses match your search.'),
-                      ),
-                    ),
-                  ...visible.map(
-                    (course) => CourseCard(
-                      course: course,
-                      onTap: () =>
-                          context.push('/learning/course', extra: course),
-                    ),
-                  ),
-                ],
               ),
-            ),
-            bottomNavigationBar: _LearningNav(index: 0),
-          );
-        },
+              const SizedBox(height: 24),
+              Text(
+                'Explore Categories',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 42,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _categories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    return ChoiceChip(
+                      label: Text(category),
+                      selected: _category == category,
+                      selectedColor: AppTheme.primaryColor.withValues(
+                        alpha: .18,
+                      ),
+                      onSelected: (_) => setState(() => _category = category),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 42,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _levels.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final level = _levels[index];
+                    return ChoiceChip(
+                      label: Text(level),
+                      selected: _level == level,
+                      selectedColor: AppTheme.primaryColor.withValues(
+                        alpha: .18,
+                      ),
+                      onSelected: (_) => setState(() => _level = level),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Popular courses',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${visible.length} ${visible.length == 1 ? 'course' : 'courses'} found',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              if (visible.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: Text('No courses match your search.')),
+                ),
+              ...visible.map(
+                (course) => CourseCard(
+                  course: course,
+                  onTap: () => context.push('/learning/course', extra: course),
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _LearningNav(index: 0),
       );
+    },
+  );
 }
 
 class CourseDetailsScreen extends StatelessWidget {
