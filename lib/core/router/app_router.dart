@@ -1,49 +1,108 @@
-import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:peer_learn_hub/core/auth/app_auth.dart';
+import 'package:peer_learn_hub/features/moderation/screens/moderator_dashboard_screen.dart';
+import 'package:peer_learn_hub/features/learning/models/learning_course.dart';
+import 'package:peer_learn_hub/features/learning/screens/learning_screens.dart';
+import 'package:peer_learn_hub/features/skill_exchange/skill_exchange.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/create_lesson_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/edit_lesson_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/my_lessons_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/skill_provider_dashboard_screen.dart';
+import 'package:peer_learn_hub/models/lesson.dart';
+import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
+import 'package:peer_learn_hub/screens/loading_screen.dart';
+import 'package:peer_learn_hub/screens/login_screen.dart';
+import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
+import 'package:peer_learn_hub/screens/register_screen.dart';
 
-import '../../features/skill_provider/screens/create_lesson_screen.dart';
-import '../../features/skill_provider/screens/edit_lesson_screen.dart';
-import '../../features/skill_provider/screens/my_lessons_screen.dart';
-import '../../features/skill_provider/screens/skill_provider_dashboard_screen.dart';
-import '../../models/lesson.dart';
-import 'app_routes.dart';
-
-class AppRouter {
-  AppRouter._();
-
-  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case AppRoutes.dashboard:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const SkillProviderDashboardScreen(),
-        );
-      case AppRoutes.myLessons:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const MyLessonsScreen(),
-        );
-      case AppRoutes.createLesson:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const CreateLessonScreen(),
-        );
-      case AppRoutes.editLesson:
-        final lesson = settings.arguments as Lesson?;
-        if (lesson == null) {
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => const SkillProviderDashboardScreen(),
-          );
-        }
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => EditLessonScreen(lesson: lesson),
-        );
-      default:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const SkillProviderDashboardScreen(),
-        );
-    }
-  }
+class RouterClass {
+  static final GoRouter router = GoRouter(
+    initialLocation: '/',
+    refreshListenable: AppAuth.instance,
+    redirect: (context, state) {
+      final location = state.matchedLocation;
+      if (!AppAuth.instance.canAccess(location)) {
+        return AppAuth.instance.getHomeRoute();
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/', builder: (context, state) => const LoadingScreen()),
+      GoRoute(
+        path: '/loading',
+        builder: (context, state) => const LoadingScreen(),
+      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/otp-verification',
+        builder: (context, state) => OtpVerificationScreen(
+          email: state.uri.queryParameters['email'],
+          isPasswordReset: state.uri.queryParameters['mode'] == 'reset',
+        ),
+      ),
+      GoRoute(
+        path: '/skill-exchange',
+        builder: (context, state) => const SkillExchangeDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/learning',
+        builder: (context, state) => const DiscoverScreen(),
+      ),
+      GoRoute(
+        path: '/learning/my-courses',
+        builder: (context, state) => const MyLearningScreen(),
+      ),
+      GoRoute(
+        path: '/learning/course',
+        builder: (context, state) {
+          final course = state.extra;
+          return course is LearningCourse
+              ? CourseDetailsScreen(course: course)
+              : const DiscoverScreen();
+        },
+      ),
+      GoRoute(
+        path: '/learning/lesson',
+        builder: (context, state) {
+          final course = state.extra;
+          return course is LearningCourse
+              ? LessonViewScreen(course: course)
+              : const MyLearningScreen();
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider',
+        builder: (context, state) => const SkillProviderDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/my-lessons',
+        builder: (context, state) => const MyLessonsScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/create',
+        builder: (context, state) => const CreateLessonScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/edit',
+        builder: (context, state) {
+          final lesson = state.extra;
+          return lesson is Lesson
+              ? EditLessonScreen(lesson: lesson)
+              : const SkillProviderDashboardScreen();
+        },
+      ),
+      GoRoute(
+        path: '/moderation',
+        builder: (context, state) => const ModeratorDashboardScreen(),
+      ),
+    ],
+  );
 }

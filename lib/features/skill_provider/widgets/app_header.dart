@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/role_switcher_button.dart';
 
 /// Teal gradient header for the Skill Provider Dashboard.
 class TealDashboardHeader extends StatelessWidget {
@@ -10,12 +11,14 @@ class TealDashboardHeader extends StatelessWidget {
     required this.welcomeTitle,
     required this.welcomeSubtitle,
     this.onRefresh,
+    this.onLogout,
   });
 
   final String title;
   final String welcomeTitle;
   final String welcomeSubtitle;
   final VoidCallback? onRefresh;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +45,19 @@ class TealDashboardHeader extends StatelessWidget {
                           ),
                     ),
                   ),
+                  // Role switcher always visible; onDark=true adapts colours
+                  const RoleSwitcherButton(onDark: true),
                   if (onRefresh != null)
                     IconButton(
                       onPressed: onRefresh,
                       icon: const Icon(Icons.refresh, color: Colors.white),
                       tooltip: 'Refresh',
+                    ),
+                  if (onLogout != null)
+                    IconButton(
+                      onPressed: onLogout,
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      tooltip: 'Logout',
                     ),
                 ],
               ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
-import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/lesson.dart';
 import '../../../services/lesson_service.dart';
@@ -127,7 +127,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
       floatingActionButton: _lessons.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () {
-                Navigator.of(context).pushNamed(AppRoutes.createLesson);
+                context.push('/skill-provider/create');
               },
               icon: const Icon(Icons.add),
               label: const Text('Create Lesson'),
@@ -172,9 +172,9 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                                 (lesson) => LessonListCard(
                                   lesson: lesson,
                                   onEdit: () {
-                                    Navigator.of(context).pushNamed(
-                                      AppRoutes.editLesson,
-                                      arguments: lesson,
+                                    context.push(
+                                      '/skill-provider/edit',
+                                      extra: lesson,
                                     );
                                   },
                                   onDelete: () => _confirmDelete(lesson),

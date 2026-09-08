@@ -3,13 +3,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:peer_learn_hub/main.dart';
 
 void main() {
-  testWidgets('PeerLearHub dashboard loads', (WidgetTester tester) async {
-    await tester.pumpWidget(const PeerLearHubApp());
+  testWidgets('PeerLearnHub welcome screen shows the onboarding content', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const PeerLearnHub());
     await tester.pumpAndSettle();
 
-    expect(find.text('Skill Provider Dashboard'), findsOneWidget);
-    expect(find.text('Welcome Back!'), findsOneWidget);
-    expect(find.text('Lesson Overview'), findsOneWidget);
-    expect(find.text('Create New Lesson'), findsOneWidget);
+    expect(find.text('PeerLearnHub'), findsOneWidget);
+    expect(find.text('Learn. Share. Grow.'), findsOneWidget);
+    expect(find.text('Get Started'), findsOneWidget);
+    expect(find.text('I already have an account'), findsOneWidget);
+    expect(
+      find.text('Learn skills. Connect with people. Grow together.'),
+      findsOneWidget,
+    );
   });
 }

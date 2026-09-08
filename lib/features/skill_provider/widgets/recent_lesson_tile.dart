@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
 import '../../../models/lesson.dart';
@@ -73,10 +73,7 @@ class RecentLessonTile extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onEdit ??
                       () {
-                        Navigator.of(context).pushNamed(
-                          AppRoutes.editLesson,
-                          arguments: lesson,
-                        );
+                        context.push('/skill-provider/edit', extra: lesson);
                       },
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Edit'),

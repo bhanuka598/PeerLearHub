@@ -1,25 +1,33 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:peer_learn_hub/core/router/app_router.dart';
+import 'package:peer_learn_hub/core/theme/app_theme.dart';
+import 'package:peer_learn_hub/firebase_options.dart';
 
-import 'core/constants/app_constants.dart';
-import 'core/router/app_router.dart';
-import 'core/router/app_routes.dart';
-import 'core/theme/app_theme.dart';
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-void main() {
-  runApp(const PeerLearHubApp());
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on UnsupportedError catch (_) {
+    // The UI can run while platform-specific Firebase configuration is added.
+  }
+
+  runApp(const PeerLearnHub());
 }
 
-class PeerLearHubApp extends StatelessWidget {
-  const PeerLearHubApp({super.key});
+class PeerLearnHub extends StatelessWidget {
+  const PeerLearnHub({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppConstants.appName,
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
+      title: 'Peer Learn Hub',
       theme: AppTheme.lightTheme,
-      initialRoute: AppRoutes.dashboard,
-      onGenerateRoute: AppRouter.onGenerateRoute,
+      routerConfig: RouterClass.router,
     );
   }
 }
