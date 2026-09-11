@@ -12,6 +12,25 @@ class AppAuth extends ChangeNotifier {
 
   AppUserRole? get currentRole => _currentRole;
 
+  static const _skillProviderRoutes = [
+    '/skill-provider',
+    '/skill-provider/my-lessons',
+    '/skill-provider/create',
+    '/skill-provider/edit',
+    '/skill-provider/lesson',
+    '/skill-provider/bookings',
+    '/skill-provider/booking',
+    '/skill-provider/reschedule',
+    '/skill-provider/messages',
+    '/skill-provider/sessions',
+    '/skill-provider/session',
+    '/skill-provider/reviews',
+    '/skill-provider/profile',
+    '/notifications',
+    '/learning/sessions',
+    '/learning/session-feedback',
+  ];
+
   void setRole(AppUserRole role) {
     _currentRole = role;
     notifyListeners();
@@ -25,7 +44,6 @@ class AppAuth extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      // Default to student for standard users
       setRole(AppUserRole.student);
     }
     return signedIn;
@@ -52,7 +70,7 @@ class AppAuth extends ChangeNotifier {
 
   bool canAccess(String location) {
     final cleanLocation = location.split('?').first;
-    final allowedForGuest = [
+    const allowedForGuest = [
       '/',
       '/loading',
       '/login',
@@ -70,21 +88,23 @@ class AppAuth extends ChangeNotifier {
             cleanLocation == '/learning/my-courses' ||
             cleanLocation == '/learning/course' ||
             cleanLocation == '/learning/lesson' ||
+            cleanLocation == '/learning/provider-lesson' ||
+            cleanLocation == '/learning/sessions' ||
+            cleanLocation == '/learning/session-feedback' ||
+            cleanLocation == '/notifications' ||
             cleanLocation == '/skill-exchange' ||
-            cleanLocation == '/skill-provider' ||
-            cleanLocation == '/skill-provider/my-lessons' ||
-            cleanLocation == '/skill-provider/create' ||
-            cleanLocation == '/skill-provider/edit';
+            _skillProviderRoutes.contains(cleanLocation);
       case AppUserRole.teacher:
         return cleanLocation == '/learning' ||
             cleanLocation == '/learning/my-courses' ||
             cleanLocation == '/learning/course' ||
             cleanLocation == '/learning/lesson' ||
+            cleanLocation == '/learning/provider-lesson' ||
+            cleanLocation == '/learning/sessions' ||
+            cleanLocation == '/learning/session-feedback' ||
+            cleanLocation == '/notifications' ||
             cleanLocation == '/skill-exchange' ||
-            cleanLocation == '/skill-provider' ||
-            cleanLocation == '/skill-provider/my-lessons' ||
-            cleanLocation == '/skill-provider/create' ||
-            cleanLocation == '/skill-provider/edit';
+            _skillProviderRoutes.contains(cleanLocation);
       case AppUserRole.admin:
         return cleanLocation == '/moderation';
       case null:

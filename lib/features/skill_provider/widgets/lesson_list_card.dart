@@ -117,7 +117,9 @@ class LessonListCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton.icon(
-                  onPressed: onView ?? () => _showViewDialog(context),
+                  onPressed: onView ??
+                      () => context.push('/skill-provider/lesson',
+                          extra: lesson),
                   icon: const Icon(Icons.visibility_outlined, size: 18),
                   label: const Text('View'),
                   style: TextButton.styleFrom(
@@ -152,46 +154,4 @@ class LessonListCard extends StatelessWidget {
     );
   }
 
-  void _showViewDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(lesson.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(lesson.description),
-              const SizedBox(height: 12),
-              Text('Category: ${lesson.category.label}'),
-              Text('Level: ${lesson.skillLevel.label}'),
-              Text('Duration: ${lesson.duration}'),
-              Text('Type: ${lesson.lessonType.label}'),
-              Text('Price: ${formatLessonPrice(lesson)}'),
-              Text('Status: ${lesson.status.label}'),
-              Text('Created: ${formatDate(lesson.createdAt)}'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.push('/skill-provider/edit', extra: lesson);
-            },
-            child: const Text('Edit'),
-          ),
-        ],
-      ),
-    );
-  }
 }

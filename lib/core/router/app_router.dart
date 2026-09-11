@@ -2,12 +2,27 @@ import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/features/moderation/screens/moderator_dashboard_screen.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_course.dart';
+import 'package:peer_learn_hub/features/learning/screens/learner_sessions_screen.dart';
 import 'package:peer_learn_hub/features/learning/screens/learning_screens.dart';
+import 'package:peer_learn_hub/features/learning/screens/session_feedback_screen.dart';
+import 'package:peer_learn_hub/features/learning/screens/student_lesson_details_screen.dart';
+import 'package:peer_learn_hub/features/notifications/screens/notifications_screen.dart';
 import 'package:peer_learn_hub/features/skill_exchange/skill_exchange.dart';
+import 'package:peer_learn_hub/features/skill_provider/models/booking_request.dart';
+import 'package:peer_learn_hub/features/skill_provider/models/provider_session.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/booking_details_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/booking_requests_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/create_lesson_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/edit_lesson_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/lesson_details_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/messages_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/my_lessons_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/ratings_reviews_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/reschedule_session_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/session_details_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/skill_provider_dashboard_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/teacher_profile_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/upcoming_sessions_screen.dart';
 import 'package:peer_learn_hub/models/lesson.dart';
 import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
@@ -79,6 +94,32 @@ class RouterClass {
         },
       ),
       GoRoute(
+        path: '/learning/provider-lesson',
+        builder: (context, state) {
+          final lesson = state.extra;
+          return lesson is Lesson
+              ? StudentLessonDetailsScreen(lesson: lesson)
+              : const DiscoverScreen();
+        },
+      ),
+      GoRoute(
+        path: '/learning/sessions',
+        builder: (context, state) => const LearnerSessionsScreen(),
+      ),
+      GoRoute(
+        path: '/learning/session-feedback',
+        builder: (context, state) {
+          final session = state.extra;
+          return session is ProviderSession
+              ? SessionFeedbackScreen(session: session)
+              : const LearnerSessionsScreen();
+        },
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
         path: '/skill-provider',
         builder: (context, state) => const SkillProviderDashboardScreen(),
       ),
@@ -98,6 +139,62 @@ class RouterClass {
               ? EditLessonScreen(lesson: lesson)
               : const SkillProviderDashboardScreen();
         },
+      ),
+      GoRoute(
+        path: '/skill-provider/lesson',
+        builder: (context, state) {
+          final lesson = state.extra;
+          return lesson is Lesson
+              ? LessonDetailsScreen(lesson: lesson)
+              : const SkillProviderDashboardScreen();
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/bookings',
+        builder: (context, state) => const BookingRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/booking',
+        builder: (context, state) {
+          final booking = state.extra;
+          return booking is BookingRequest
+              ? BookingDetailsScreen(booking: booking)
+              : const BookingRequestsScreen();
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/reschedule',
+        builder: (context, state) {
+          final booking = state.extra;
+          return booking is BookingRequest
+              ? RescheduleSessionScreen(booking: booking)
+              : const BookingRequestsScreen();
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/messages',
+        builder: (context, state) => const MessagesScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/sessions',
+        builder: (context, state) => const UpcomingSessionsScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/session',
+        builder: (context, state) {
+          final session = state.extra;
+          return session is ProviderSession
+              ? SessionDetailsScreen(session: session)
+              : const UpcomingSessionsScreen();
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/reviews',
+        builder: (context, state) => const RatingsReviewsScreen(),
+      ),
+      GoRoute(
+        path: '/skill-provider/profile',
+        builder: (context, state) => const TeacherProfileScreen(),
       ),
       GoRoute(
         path: '/moderation',

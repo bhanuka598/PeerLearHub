@@ -3,8 +3,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/app_auth.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/lesson_display_utils.dart';
 import '../../../core/widgets/role_switcher_button.dart';
+import '../../notifications/widgets/notification_bell_button.dart';
+import '../../../models/lesson.dart';
+import '../../skill_provider/services/firebase_lesson_service.dart';
+import '../../skill_provider/services/review_service.dart';
 import '../data/learning_store.dart';
+import '../data/student_lesson_store.dart';
 import '../models/learning_course.dart';
 
 class DiscoverScreen extends StatefulWidget {
@@ -16,6 +22,7 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   String _category = 'All';
   String _query = '';
+  List<Lesson> _teacherLessons = [];
   static const _categories = [
     'All',
     'Mobile',
@@ -25,6 +32,45 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     'Backend',
     'Database',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseLessonService.instance.addListener(_loadTeacherLessons);
+    ReviewService.instance.addListener(_onReviewsChanged);
+    StudentLessonStore.instance.load();
+    ReviewService.instance.refresh();
+    _loadTeacherLessons();
+  }
+
+  @override
+  void dispose() {
+    FirebaseLessonService.instance.removeListener(_loadTeacherLessons);
+    ReviewService.instance.removeListener(_onReviewsChanged);
+    super.dispose();
+  }
+
+  void _onReviewsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadTeacherLessons() async {
+    final lessons = await FirebaseLessonService.instance.getPublishedLessons();
+    if (mounted) {
+      setState(() => _teacherLessons = lessons);
+    }
+  }
+
+  List<Lesson> get _visibleTeacherLessons {
+    final query = _query.toLowerCase();
+    return _teacherLessons.where((lesson) {
+      final matchesQuery = query.isEmpty ||
+          '${lesson.title} ${lesson.category.label} ${lesson.description}'
+              .toLowerCase()
+              .contains(query);
+      return matchesQuery;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) =>
@@ -44,6 +90,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             appBar: AppBar(
               title: const Text('PeerLearnHub'),
               actions: [
+                const NotificationBellButton(onDark: true),
                 const RoleSwitcherButton(onDark: true),
                 IconButton(
                   onPressed: () {
@@ -101,6 +148,32 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       },
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Lessons from teachers',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_visibleTeacherLessons.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'No published lessons yet. Teachers can add one from Create Lesson.',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                    )
+                  else
+                    ..._visibleTeacherLessons.map(
+                      (lesson) => TeacherLessonCard(
+                        lesson: lesson,
+                        onTap: () => context.push(
+                          '/learning/provider-lesson',
+                          extra: lesson,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 24),
                   Text(
                     'Popular courses',
@@ -188,8 +261,40 @@ class CourseDetailsScreen extends StatelessWidget {
   );
 }
 
-class MyLearningScreen extends StatelessWidget {
+class MyLearningScreen extends StatefulWidget {
   const MyLearningScreen({super.key});
+
+  @override
+  State<MyLearningScreen> createState() => _MyLearningScreenState();
+}
+
+class _MyLearningScreenState extends State<MyLearningScreen> {
+  List<Lesson> _published = [];
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseLessonService.instance.addListener(_load);
+    StudentLessonStore.instance.addListener(_onStoreChanged);
+    StudentLessonStore.instance.load();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    FirebaseLessonService.instance.removeListener(_load);
+    StudentLessonStore.instance.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load() async {
+    final lessons = await FirebaseLessonService.instance.getPublishedLessons();
+    if (mounted) setState(() => _published = lessons);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -197,21 +302,57 @@ class MyLearningScreen extends StatelessWidget {
       valueListenable: LearningStore.instance,
       builder: (context, courses, _) {
         final enrolled = courses.where((course) => course.enrolled).toList();
+        final teacherLessons =
+            StudentLessonStore.instance.enrolledFrom(_published);
         return Scaffold(
           appBar: AppBar(
             title: const Text('My Courses'),
-            actions: const [RoleSwitcherButton()],
+            actions: const [
+              NotificationBellButton(),
+              RoleSwitcherButton(),
+            ],
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (enrolled.isEmpty)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(
+                  Icons.event_available_outlined,
+                  color: AppTheme.primaryColor,
+                ),
+                title: const Text('My Sessions'),
+                subtitle: const Text('Upcoming classes, reminders, and feedback'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/learning/sessions'),
+              ),
+              const SizedBox(height: 12),
+              if (teacherLessons.isEmpty && enrolled.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(40),
                   child: Center(
-                    child: Text('Enroll in a course to start learning.'),
+                    child: Text('Add a lesson or enroll in a course to start learning.'),
                   ),
                 ),
+              if (teacherLessons.isNotEmpty) ...[
+                Text(
+                  'My lessons',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                ...teacherLessons.map(
+                  (lesson) => TeacherLessonCard(
+                    lesson: lesson,
+                    onTap: () => context.push(
+                      '/learning/provider-lesson',
+                      extra: lesson,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
               ...enrolled.map(
                 (course) => LearningCourseCard(
                   course: course,
@@ -346,6 +487,115 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class TeacherLessonCard extends StatelessWidget {
+  const TeacherLessonCard({
+    super.key,
+    required this.lesson,
+    required this.onTap,
+  });
+
+  final Lesson lesson;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = ReviewService.instance.averageForLesson(lesson.id);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 14),
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 106,
+              height: 132,
+              child: _thumb(),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      lesson.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${lesson.category.label} • ${lesson.skillLevel.label}',
+                      style: const TextStyle(color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Colors.amber,
+                          size: 18,
+                        ),
+                        Text(rating == 0 ? ' New' : ' ${rating.toStringAsFixed(1)}'),
+                        const Spacer(),
+                        Text(
+                          lesson.duration,
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      formatLessonPrice(lesson),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _thumb() {
+    final url = lesson.imageUrl?.trim();
+    final hasImage = url != null &&
+        url.isNotEmpty &&
+        !url.contains('placeholder.peerlearnhub.com');
+    if (hasImage && url.startsWith('data:image/')) {
+      final data = Uri.tryParse(url)?.data;
+      if (data != null) {
+        return Image.memory(
+          data.contentAsBytes(),
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _thumbPlaceholder(),
+        );
+      }
+    }
+    if (hasImage && url.startsWith('http')) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _thumbPlaceholder(),
+      );
+    }
+    return _thumbPlaceholder();
+  }
+
+  Widget _thumbPlaceholder() {
+    return const ColoredBox(
+      color: AppTheme.iconBackground,
+      child: Icon(Icons.image_outlined, color: AppTheme.primaryColor, size: 36),
     );
   }
 }
