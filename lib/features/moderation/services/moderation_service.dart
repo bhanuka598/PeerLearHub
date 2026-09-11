@@ -3,7 +3,7 @@ import '../models/moderation_report.dart';
 
 class ModerationService {
   // Flag to use mock data (set to true when Firebase is not configured)
-  static bool useMockData = true;
+  static bool useMockData = false;
   
   final String _collection = 'reports';
 
