@@ -5,6 +5,9 @@ import '../services/moderation_service.dart';
 import 'verification_requests_screen.dart';
 import 'reports_screen.dart';
 import 'moderator_profile_screen.dart';
+import 'activity_log_screen.dart';
+import 'community_safety_screen.dart';
+import 'moderation_actions_screen.dart';
 
 class ModeratorDashboardScreen extends StatefulWidget {
   const ModeratorDashboardScreen({super.key});
@@ -245,7 +248,14 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                               ),
                             ),
                             TextButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ModerationActionsScreen(),
+                                  ),
+                                );
+                              },
                               child: const Text(
                                 'View All',
                                 style: TextStyle(
@@ -283,6 +293,83 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                         '4 hrs ago',
                         Colors.green,
                         Icons.circle,
+                      ),
+                      
+                      // Community Safety Quick Access
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const CommunitySafetyScreen(),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.primaryTeal,
+                                    AppColors.primaryTeal.withOpacity(0.8),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primaryTeal.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.shield_outlined,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Community Safety',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'View trust index & safety alerts',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.arrow_forward,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                       
                       const SizedBox(height: 100),
@@ -471,6 +558,15 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
           ).then((_) {
             setState(() => _selectedIndex = 0);
             _loadStatistics();
+          });
+        } else if (index == 3) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ActivityLogScreen(),
+            ),
+          ).then((_) {
+            setState(() => _selectedIndex = 0);
           });
         } else if (index == 4) {
           Navigator.push(
