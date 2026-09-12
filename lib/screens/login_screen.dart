@@ -62,7 +62,28 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      AppAuth.instance.setRole(AppUserRole.student);
+
+      try {
+        final loginData = await AuthService.instance.loginWithRole();
+        final roleString = loginData['user']['role'] as String?;
+
+        switch (roleString) {
+          case 'moderator':
+            AppAuth.instance.setRole(AppUserRole.moderator);
+            break;
+          case 'teacher':
+            AppAuth.instance.setRole(AppUserRole.teacher);
+            break;
+          case 'admin':
+            AppAuth.instance.setRole(AppUserRole.admin);
+            break;
+          default:
+            AppAuth.instance.setRole(AppUserRole.student);
+        }
+      } catch (_) {
+        AppAuth.instance.setRole(AppUserRole.student);
+      }
+
       context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {
@@ -146,9 +167,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: AuthFormShell(
-        leading: AuthBackButton(onPressed: () => context.pop()),
+        leading: AuthBackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
+        ),
         title: 'Welcome back',
-        subtitle: 'Sign in to continue learning and sharing skills with your community.',
+        subtitle:
+            'Sign in to continue learning and sharing skills with your community.',
         footer: AuthFooterLink(
           prompt: "Don't have an account?",
           actionLabel: 'Sign up',
@@ -234,6 +262,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 label: 'Continue with Apple',
                 icon: Icons.apple,
                 onPressed: () {},
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/moderation/register'),
+                  child: const Text(
+                    'Register as Moderator',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

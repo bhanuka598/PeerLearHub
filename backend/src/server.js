@@ -16,7 +16,14 @@ const app = express();
 const port = Number(process.env.PORT || 4000);
 const otpStore = new Map();
 
-app.use(cors({ origin: true, credentials: true }));
+// Configure CORS to allow requests from Flutter web
+app.use(cors({
+  origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: '2mb' }));
 
 function initializeFirebaseAdmin() {
@@ -84,7 +91,12 @@ app.post('/api/auth/verify-token', async (req, res) => {
     }
 
     const decodedToken = await getAuth().verifyIdToken(idToken);
-
+    
+    // Fetch user role from Firestore
+    const db = getFirestore();
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    
     return res.json({
       success: true,
       user: {
@@ -93,6 +105,7 @@ app.post('/api/auth/verify-token', async (req, res) => {
         name: decodedToken.name ?? null,
         picture: decodedToken.picture ?? null,
         provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
+        role: userData.role || 'student',
       },
     });
   } catch (error) {
@@ -111,6 +124,159 @@ app.post('/api/auth/verify-token', async (req, res) => {
     });
   }
 });
+
+app.post('/api/auth/register-moderator', async (req, res) => {
+  try {
+    const { idToken } = req.body ?? {};
+
+    if (!idToken || typeof idToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing Firebase ID token.',
+      });
+    }
+
+    // Verify Firebase token
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userId = decodedToken.uid;
+
+    // Update user role in Firestore
+    const db = getFirestore();
+    await db.collection('users').doc(userId).set({
+      role: 'moderator',
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      message: 'User promoted to moderator successfully.',
+      user: {
+        uid: userId,
+        email: decodedToken.email,
+        role: 'moderator',
+      },
+    });
+  } catch (error) {
+    console.error('Moderator registration failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to register moderator.',
+    });
+  }
+});
+
+// Role-based login endpoint
+app.post('/api/auth/login-with-role', async (req, res) => {
+  try {
+    const { idToken } = req.body ?? {};
+
+    if (!idToken || typeof idToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing Firebase ID token.',
+      });
+    }
+
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    
+    // Fetch user role from Firestore
+    const db = getFirestore();
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found in database.',
+      });
+    }
+
+    const userData = userDoc.data();
+    const userRole = userData.role || 'student';
+
+    return res.json({
+      success: true,
+      user: {
+        uid: decodedToken.uid,
+        email: decodedToken.email ?? null,
+        name: decodedToken.name ?? null,
+        picture: decodedToken.picture ?? null,
+        provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
+        role: userRole,
+      },
+      redirectRoute: getRedirectRoute(userRole),
+    });
+  } catch (error) {
+    console.error('Role-based login failed:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired Firebase token.',
+    });
+  }
+});
+
+// Helper function to get redirect route based on role
+function getRedirectRoute(role) {
+  switch (role) {
+    case 'moderator':
+      return '/moderation';
+    case 'teacher':
+      return '/skill-provider';
+    case 'student':
+    default:
+      return '/learning';
+  }
+}
+
+// Middleware to check if user has required role
+function requireRole(...allowedRoles) {
+  return async (req, res, next) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authorization header required.',
+        });
+      }
+
+      const idToken = authHeader.substring(7);
+      const decodedToken = await getAuth().verifyIdToken(idToken);
+      
+      const db = getFirestore();
+      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.',
+        });
+      }
+
+      const userData = userDoc.data();
+      const userRole = userData.role || 'student';
+
+      if (!allowedRoles.includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. Required role: ${allowedRoles.join(' or ')}`,
+        });
+      }
+
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        role: userRole,
+      };
+      next();
+    } catch (error) {
+      console.error('Role verification failed:', error);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authorization token.',
+      });
+    }
+  };
+}
 
 function hashOtp(otp) {
   return crypto.createHash('sha256').update(otp).digest('hex');
@@ -195,6 +361,116 @@ app.post('/api/auth/password-reset/verify', async (req, res) => {
   }
 });
 
+// Example protected route for moderators only
+app.get('/api/moderation/dashboard-stats', requireRole('moderator', 'admin'), async (req, res) => {
+  try {
+    const db = getFirestore();
+    
+    // Get verification requests stats
+    const verificationSnapshot = await db.collection('verificationRequests')
+      .where('status', '==', 'pending')
+      .get();
+    
+    // Get reports stats
+    const reportsSnapshot = await db.collection('reports')
+      .where('status', '==', 'open')
+      .get();
+    
+    return res.json({
+      success: true,
+      stats: {
+        pendingVerifications: verificationSnapshot.size,
+        openReports: reportsSnapshot.size,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to fetch dashboard stats:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard statistics.',
+    });
+  }
+});
+
+// Example protected route for teachers and moderators
+app.get('/api/lessons/my-lessons', requireRole('teacher', 'moderator', 'admin'), async (req, res) => {
+  try {
+    const db = getFirestore();
+    const { uid } = req.user;
+    
+    const lessonsSnapshot = await db.collection('lessons')
+      .where('authorId', '==', uid)
+      .get();
+    
+    const lessons = lessonsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    
+    return res.json({
+      success: true,
+      lessons,
+    });
+  } catch (error) {
+    console.error('Failed to fetch lessons:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch lessons.',
+    });
+  }
+});
+
+// Assignment submission endpoint
+app.post('/api/assignments/submit', async (req, res) => {
+  try {
+    const { idToken, courseId, description, githubUrl } = req.body;
+    
+    if (!idToken) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    // Verify Firebase token
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userId = decodedToken.uid;
+
+    if (!courseId || !description || !githubUrl) {
+      return res.status(400).json({ success: false, message: 'Missing required fields.' });
+    }
+
+    // Validate GitHub URL
+    try {
+      const githubUrlObj = new URL(githubUrl.trim());
+      if (!githubUrlObj.hostname.includes('github.com')) {
+        return res.status(400).json({ success: false, message: 'Invalid GitHub URL.' });
+      }
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid GitHub URL format.' });
+    }
+
+    // Save assignment data to Firestore (without file)
+    const db = getFirestore();
+    await db.collection('users').doc(userId).collection('assignments').doc(courseId).set({
+      courseId,
+      description: description.trim(),
+      githubUrl: githubUrl.trim(),
+      status: 'submitted',
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    return res.json({ 
+      success: true, 
+      message: 'Assignment submitted successfully'
+    });
+  } catch (error) {
+    console.error('Assignment submission failed:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Assignment submission failed.' 
+    });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -204,4 +480,5 @@ app.use((req, res) => {
 
 app.listen(port, () => {
   console.log(`PeerLearnHub backend listening on http://localhost:${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 });

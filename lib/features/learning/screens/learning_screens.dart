@@ -7,16 +7,18 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
 import '../../../core/utils/lesson_image.dart';
 import '../../../core/widgets/role_switcher_button.dart';
-import '../../notifications/widgets/notification_bell_button.dart';
 import '../../../models/lesson.dart';
+import '../../notifications/widgets/notification_bell_button.dart';
 import '../../skill_provider/models/provider_session.dart';
 import '../../skill_provider/services/firebase_lesson_service.dart';
 import '../../skill_provider/services/review_service.dart';
 import '../../skill_provider/services/session_service.dart';
 import '../../skill_provider/utils/display_utils.dart';
+import '../data/learning_quiz_data.dart';
 import '../data/learning_store.dart';
 import '../data/student_lesson_store.dart';
 import '../models/learning_course.dart';
+import '../models/learning_quiz.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -27,9 +29,12 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   final _searchController = TextEditingController();
   String _category = 'All';
+  String _level = 'All Levels';
   String _query = '';
   List<Lesson> _teacherLessons = [];
   bool _loadingLessons = true;
+
+  static const _levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
 
   @override
   void initState() {
@@ -39,6 +44,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     StudentLessonStore.instance.load();
     ReviewService.instance.refresh();
     _loadTeacherLessons();
+    LearningStore.instance.loadEnrollments();
   }
 
   @override
@@ -75,16 +81,35 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return ['All', ...sorted];
   }
 
+  bool _matchesSearch(LearningCourse course) {
+    final searchableText = [
+      course.title,
+      course.description,
+      course.category,
+      course.level,
+      course.instructor,
+      ...course.modules.map((module) => module.title),
+    ].join(' ').toLowerCase();
+    final terms = _query
+        .trim()
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((term) => term.isNotEmpty);
+    return terms.every(searchableText.contains);
+  }
+
   List<Lesson> _visibleTeacherLessonsFor(String category) {
     final query = _query.toLowerCase();
     return _teacherLessons.where((lesson) {
       final matchesCategory =
           category == 'All' || lesson.category.label == category;
+      final matchesLevel =
+          _level == 'All Levels' || lesson.skillLevel.label == _level;
       final matchesQuery = query.isEmpty ||
           '${lesson.title} ${lesson.category.label} ${lesson.description}'
               .toLowerCase()
               .contains(query);
-      return matchesCategory && matchesQuery;
+      return matchesCategory && matchesLevel && matchesQuery;
     }).toList();
   }
 
@@ -114,9 +139,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 (course) =>
                     (selectedCategory == 'All' ||
                         course.category == selectedCategory) &&
-                    ('${course.title} ${course.category} ${course.instructor}'
-                        .toLowerCase()
-                        .contains(_query.toLowerCase())),
+                    (_level == 'All Levels' || course.level == _level) &&
+                    _matchesSearch(course),
               )
               .toList();
           final teacherLessons = _visibleTeacherLessonsFor(selectedCategory);
@@ -124,7 +148,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             backgroundColor: AppTheme.backgroundColor,
             body: RefreshIndicator(
               color: AppTheme.primaryColor,
-              onRefresh: _loadTeacherLessons,
+              onRefresh: () async {
+                await Future.wait([
+                  _loadTeacherLessons(),
+                  LearningStore.instance.loadEnrollments(),
+                ]);
+              },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -136,6 +165,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       searchController: _searchController,
                       onQueryChanged: (value) =>
                           setState(() => _query = value),
+                      onProfile: () => context.go('/profile'),
                       onLogout: () {
                         AppAuth.instance.logout();
                         context.go('/');
@@ -146,7 +176,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        _DiscoverSectionHeader(
+                        const _DiscoverSectionHeader(
                           title: 'Categories',
                           subtitle: 'Filter by what you want to learn',
                         ),
@@ -156,6 +186,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           selected: selectedCategory,
                           onSelected: (value) =>
                               setState(() => _category = value),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 42,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _levels.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, index) {
+                              final level = _levels[index];
+                              return ChoiceChip(
+                                label: Text(level),
+                                selected: _level == level,
+                                selectedColor:
+                                    AppTheme.primaryColor.withValues(alpha: .18),
+                                onSelected: (_) =>
+                                    setState(() => _level = level),
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 24),
                         _DiscoverSectionHeader(
@@ -177,10 +228,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         else if (teacherLessons.isEmpty)
                           _DiscoverEmptyState(
                             icon: Icons.menu_book_outlined,
-                            title: _query.isNotEmpty || selectedCategory != 'All'
+                            title: _query.isNotEmpty ||
+                                    selectedCategory != 'All' ||
+                                    _level != 'All Levels'
                                 ? 'No lessons match'
                                 : 'No lessons yet',
-                            message: _query.isNotEmpty || selectedCategory != 'All'
+                            message: _query.isNotEmpty ||
+                                    selectedCategory != 'All' ||
+                                    _level != 'All Levels'
                                 ? 'Try another search or category.'
                                 : 'Teachers can publish a lesson from Create Lesson.',
                           )
@@ -234,57 +289,63 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 class CourseDetailsScreen extends StatelessWidget {
   const CourseDetailsScreen({super.key, required this.course});
   final LearningCourse course;
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Course details')),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _CourseHero(course: course),
-        const SizedBox(height: 24),
-        Text(
-          'Course Modules',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Column(
-            children: [
-              for (var i = 0; i < course.modules.length; i++)
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.iconBackground,
-                    child: Text(
-                      '${i + 1}',
-                      style: const TextStyle(color: AppTheme.primaryColor),
+        appBar: AppBar(title: const Text('Course details')),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _CourseHero(course: course),
+            const SizedBox(height: 24),
+            Text(
+              'Course Modules',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Column(
+                children: [
+                  for (var i = 0; i < course.modules.length; i++)
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.iconBackground,
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(color: AppTheme.primaryColor),
+                        ),
+                      ),
+                      title: Text(course.modules[i].title),
+                      subtitle: Text(
+                        '${course.modules[i].lessonCount} lessons • ${course.modules[i].duration}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
                     ),
-                  ),
-                  title: Text(course.modules[i].title),
-                  subtitle: Text(
-                    '${course.modules[i].lessonCount} lessons • ${course.modules[i].duration}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-            ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: FilledButton(
+              onPressed: () async {
+                await LearningStore.instance.enroll(course);
+                if (!context.mounted) {
+                  return;
+                }
+                context.go('/learning/my-courses');
+              },
+              child:
+                  Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
+            ),
           ),
         ),
-      ],
-    ),
-    bottomNavigationBar: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FilledButton(
-          onPressed: () {
-            LearningStore.instance.enroll(course);
-            context.go('/learning/my-courses');
-          },
-          child: Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
-        ),
-      ),
-    ),
-  );
+      );
 }
 
 class MyLearningScreen extends StatefulWidget {
@@ -305,6 +366,7 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
     FirebaseLessonService.instance.addListener(_load);
     StudentLessonStore.instance.addListener(_onStoreChanged);
     SessionService.instance.addListener(_load);
+    LearningStore.instance.loadEnrollments();
     _load();
   }
 
@@ -381,7 +443,12 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
           backgroundColor: AppTheme.backgroundColor,
           body: RefreshIndicator(
             color: AppTheme.primaryColor,
-            onRefresh: _load,
+            onRefresh: () async {
+              await Future.wait([
+                _load(),
+                LearningStore.instance.loadEnrollments(),
+              ]);
+            },
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -390,6 +457,7 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
                     greeting: _firstName.isEmpty
                         ? 'Keep learning'
                         : 'Keep going, $_firstName',
+                    onProfile: () => context.go('/profile'),
                     onLogout: () {
                       AppAuth.instance.logout();
                       context.go('/');
@@ -452,16 +520,39 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
                           ),
                           const SizedBox(height: 12),
                           ...enrolledCourses.map(
-                            (course) => LearningCourseCard(
-                              course: course,
-                              onContinue: () => context.push(
-                                '/learning/lesson',
-                                extra: course,
-                              ),
-                              onTap: () => context.push(
-                                '/learning/course',
-                                extra: course,
-                              ),
+                            (course) => Column(
+                              children: [
+                                LearningCourseCard(
+                                  course: course,
+                                  onContinue: () => context.push(
+                                    '/learning/lesson',
+                                    extra: course,
+                                  ),
+                                  onTap: () => context.push(
+                                    '/learning/course',
+                                    extra: course,
+                                  ),
+                                ),
+                                if (LearningStore.instance
+                                    .canSubmitAssignment(course))
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 16),
+                                      child: OutlinedButton.icon(
+                                        onPressed: () => context.push(
+                                          '/learning/assignment',
+                                          extra: course,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.assignment_outlined,
+                                        ),
+                                        label: const Text('Submit assignment'),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ],
@@ -546,9 +637,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
           const SizedBox(height: 20),
           Text(
             'Discussion',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           ..._messages.map(
             (message) => ListTile(
@@ -585,16 +677,178 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: FilledButton(
-            onPressed: () {
-              LearningStore.instance.updateProgress(
+            onPressed: () async {
+              await LearningStore.instance.updateProgress(
                 widget.course,
                 widget.course.progress + 5,
               );
-              context.go('/learning/my-courses');
+              if (!context.mounted) {
+                return;
+              }
+              context.push(
+                '/learning/quiz',
+                extra: quizForModule(widget.course, 2),
+              );
             },
-            child: const Text('Mark lesson complete'),
+            child: const Text('Complete lesson and take quiz'),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class QuizScreen extends StatefulWidget {
+  const QuizScreen({super.key, required this.quiz});
+
+  final LearningQuiz quiz;
+
+  @override
+  State<QuizScreen> createState() => _QuizScreenState();
+}
+
+class _QuizScreenState extends State<QuizScreen> {
+  int _questionIndex = 0;
+  int _attemptsForQuestion = 0;
+  int _score = 0;
+  int? _selectedIndex;
+  bool _checking = false;
+
+  QuizQuestion get _question => widget.quiz.questions[_questionIndex];
+
+  Future<void> _submitAnswer() async {
+    final selected = _selectedIndex;
+    if (selected == null || _checking) {
+      return;
+    }
+
+    setState(() => _checking = true);
+    final correct = selected == _question.correctIndex;
+    if (!correct) {
+      setState(() {
+        _attemptsForQuestion++;
+        _selectedIndex = null;
+        _checking = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not quite. Try this question again.')),
+      );
+      return;
+    }
+
+    final earned = _attemptsForQuestion == 0 ? 5 : 3;
+    final newScore = _score + earned;
+    if (_questionIndex < widget.quiz.questions.length - 1) {
+      setState(() {
+        _score = newScore;
+        _questionIndex++;
+        _attemptsForQuestion = 0;
+        _selectedIndex = null;
+        _checking = false;
+      });
+      return;
+    }
+
+    final total = await LearningStore.instance.saveQuizPoints(
+      course: _courseForQuiz,
+      moduleId: widget.quiz.moduleId,
+      points: newScore,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _score = newScore;
+      _checking = false;
+    });
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Quiz complete!'),
+        content: Text(
+          'You earned $newScore points. Your total is $total points.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/learning/my-courses');
+            },
+            child: const Text('Back to My Courses'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  LearningCourse get _courseForQuiz => LearningStore.instance.value.firstWhere(
+        (course) => course.id == widget.quiz.courseId,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (_questionIndex + 1) / widget.quiz.questions.length;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.quiz.moduleTitle} Quiz'),
+        actions: const [RoleSwitcherButton()],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          LinearProgressIndicator(
+            value: progress,
+            color: AppTheme.primaryColor,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Question ${_questionIndex + 1} of ${widget.quiz.questions.length}',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _question.question,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          for (var i = 0; i < _question.options.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: RadioListTile<int>(
+                value: i,
+                groupValue: _selectedIndex,
+                onChanged: _checking
+                    ? null
+                    : (value) => setState(() => _selectedIndex = value),
+                title: Text(_question.options[i]),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                tileColor: _selectedIndex == i
+                    ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                    : null,
+              ),
+            ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed:
+                _selectedIndex == null || _checking ? null : _submitAnswer,
+            child: Text(
+              _questionIndex == widget.quiz.questions.length - 1
+                  ? 'Finish Quiz'
+                  : 'Check Answer',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(child: Text('Quiz points: $_score')),
+        ],
       ),
     );
   }
@@ -849,10 +1103,12 @@ class LearningCourseCard extends StatelessWidget {
 class _MyLearningHeader extends StatelessWidget {
   const _MyLearningHeader({
     required this.greeting,
+    required this.onProfile,
     required this.onLogout,
   });
 
   final String greeting;
+  final VoidCallback onProfile;
   final VoidCallback onLogout;
 
   @override
@@ -885,6 +1141,12 @@ class _MyLearningHeader extends StatelessWidget {
                   ),
                   const NotificationBellButton(onDark: true),
                   const RoleSwitcherButton(onDark: true),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onProfile,
+                    icon: const Icon(Icons.person, color: Colors.white),
+                    tooltip: 'Profile',
+                  ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: onLogout,
@@ -1207,9 +1469,10 @@ class _CourseHero extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           course.title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context)
+              .textTheme
+              .headlineSmall
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
@@ -1245,12 +1508,14 @@ class _DiscoverHeader extends StatelessWidget {
     required this.greeting,
     required this.searchController,
     required this.onQueryChanged,
+    required this.onProfile,
     required this.onLogout,
   });
 
   final String greeting;
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
+  final VoidCallback onProfile;
   final VoidCallback onLogout;
 
   @override
@@ -1283,6 +1548,12 @@ class _DiscoverHeader extends StatelessWidget {
                   ),
                   const NotificationBellButton(onDark: true),
                   const RoleSwitcherButton(onDark: true),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onProfile,
+                    icon: const Icon(Icons.person, color: Colors.white),
+                    tooltip: 'Profile',
+                  ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: onLogout,
@@ -1345,10 +1616,7 @@ class _DiscoverHeader extends StatelessWidget {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Colors.white,
-                      width: 0,
-                    ),
+                    borderSide: const BorderSide(color: Colors.white, width: 0),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -1640,46 +1908,52 @@ class _CatalogMetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[
-      Icon(
-        rating == 0 ? Icons.auto_awesome_rounded : Icons.star_rounded,
-        color: rating == 0 ? AppTheme.primaryColor : const Color(0xFFF5A623),
-        size: 15,
-      ),
-      const SizedBox(width: 3),
-      Text(
-        rating == 0 ? 'New' : rating.toStringAsFixed(1),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
+    return Row(
+      children: [
+        Icon(
+          rating == 0 ? Icons.auto_awesome_rounded : Icons.star_rounded,
+          color: rating == 0 ? AppTheme.primaryColor : const Color(0xFFF5A623),
+          size: 15,
         ),
-      ),
-      if (duration.trim().isNotEmpty) ...[
-        _metaDot(),
-        Flexible(
-          child: Text(
-            duration,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        const SizedBox(width: 3),
+        Text(
+          rating == 0 ? 'New' : rating.toStringAsFixed(1),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
           ),
         ),
-      ],
-      if (extra != null && extra!.trim().isNotEmpty) ...[
-        _metaDot(),
-        Flexible(
-          child: Text(
-            extra!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        if (duration.trim().isNotEmpty) ...[
+          _metaDot(),
+          Flexible(
+            child: Text(
+              duration,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
           ),
-        ),
+        ],
+        if (extra != null && extra!.trim().isNotEmpty) ...[
+          _metaDot(),
+          Flexible(
+            child: Text(
+              extra!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ],
-    ];
-
-    return Row(children: items);
+    );
   }
 
   Widget _metaDot() {
@@ -1741,8 +2015,15 @@ class _LearningNav extends StatelessWidget {
       selectedIndex: index,
       backgroundColor: Colors.white,
       indicatorColor: AppTheme.iconBackground,
-      onDestinationSelected: (value) =>
-          context.go(value == 0 ? '/learning' : '/learning/my-courses'),
+      onDestinationSelected: (value) {
+        if (value == 0) {
+          context.go('/learning');
+        } else if (value == 1) {
+          context.go('/learning/my-courses');
+        } else if (value == 2) {
+          context.go('/skill-exchange');
+        }
+      },
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.explore_outlined),
@@ -1753,6 +2034,11 @@ class _LearningNav extends StatelessWidget {
           icon: Icon(Icons.play_lesson_outlined),
           selectedIcon: Icon(Icons.play_lesson, color: AppTheme.primaryColor),
           label: 'My Learning',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.swap_horiz_outlined),
+          selectedIcon: Icon(Icons.swap_horiz, color: AppTheme.primaryColor),
+          label: 'Skill Exchange',
         ),
       ],
     );

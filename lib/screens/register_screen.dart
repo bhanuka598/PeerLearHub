@@ -127,7 +127,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) {
         return;
       }
-      AppAuth.instance.setRole(AppUserRole.student);
+
+      try {
+        final loginData = await AuthService.instance.loginWithRole();
+        final roleString = loginData['user']['role'] as String?;
+
+        switch (roleString) {
+          case 'moderator':
+            AppAuth.instance.setRole(AppUserRole.moderator);
+            break;
+          case 'teacher':
+            AppAuth.instance.setRole(AppUserRole.teacher);
+            break;
+          case 'admin':
+            AppAuth.instance.setRole(AppUserRole.admin);
+            break;
+          default:
+            AppAuth.instance.setRole(AppUserRole.student);
+        }
+      } catch (_) {
+        AppAuth.instance.setRole(AppUserRole.student);
+      }
+
       context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {
@@ -219,9 +240,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       body: AuthFormShell(
-        leading: AuthBackButton(onPressed: () => context.pop()),
+        leading: AuthBackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
+        ),
         title: 'Create your account',
-        subtitle: 'Join PeerLearnHub and start your learning journey in minutes.',
+        subtitle:
+            'Join PeerLearnHub and start your learning journey in minutes.',
         footer: AuthFooterLink(
           prompt: 'Already have an account?',
           actionLabel: 'Sign in',
@@ -290,7 +318,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   suffix: IconButton(
                     onPressed: () {
                       setState(
-                        () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                        () =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword,
                       );
                     },
                     icon: Icon(
@@ -392,6 +421,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 icon: Icons.g_mobiledata_rounded,
                 isLoading: _isGoogleSubmitting,
                 onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/moderation/register'),
+                  child: const Text(
+                    'Register as Moderator',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

@@ -19,9 +19,9 @@ class AuthService {
   static const String _googleServerClientId =
       '536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com';
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: _googleServerClientId,
-  );
+  final GoogleSignIn _googleSignIn = kIsWeb
+      ? GoogleSignIn(clientId: _googleServerClientId)
+      : GoogleSignIn(serverClientId: _googleServerClientId);
   String? _lastError;
 
   String? get lastError => _lastError;
@@ -66,6 +66,7 @@ class AuthService {
     required String email,
     required String password,
     required String learningGoal,
+    String role = 'student',
   }) async {
     _lastError = null;
     final credential = await _requiredFirebaseAuth
@@ -85,7 +86,7 @@ class AuthService {
         'fullName': fullName.trim(),
         'email': user.email,
         'learningGoal': learningGoal,
-        'role': 'student',
+        'role': role,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -274,5 +275,87 @@ class AuthService {
       debugPrint('Google sign-in failed: $error');
       return false;
     }
+  }
+
+  Future<bool> isModerator() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (!userDoc.exists) {
+        return false;
+      }
+
+      final userData = userDoc.data();
+      if (userData == null) {
+        return false;
+      }
+
+      return userData['role'] == 'moderator';
+    } catch (e) {
+      debugPrint('Error checking moderator status: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> registerAsModerator() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in to register as moderator.');
+    }
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/register-moderator'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+      }),
+    );
+
+    final payload = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Failed to register as moderator.');
+    }
+
+    return Map<String, dynamic>.from(payload['user'] as Map);
+  }
+
+  Future<Map<String, dynamic>> loginWithRole() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in.');
+    }
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/login-with-role'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+
+    final payload = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Login failed.');
+    }
+
+    return Map<String, dynamic>.from(payload as Map);
   }
 }

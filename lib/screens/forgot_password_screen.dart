@@ -67,7 +67,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => context.canPop() ? context.pop() : null,
                   icon: const Icon(Icons.arrow_back_ios_new_rounded),
                   style: IconButton.styleFrom(
                     backgroundColor: AppTheme.iconBackground,

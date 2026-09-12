@@ -128,6 +128,13 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
             ],
           ),
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              context.go('/profile');
+            },
+            tooltip: 'Profile',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               AppAuth.instance.logout();
@@ -165,6 +172,35 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Propose Swap'),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 2,
+        onDestinationSelected: (value) {
+          if (value == 0) {
+            context.go('/learning');
+          } else if (value == 1) {
+            context.go('/learning/my-courses');
+          } else if (value == 2) {
+            context.go('/skill-exchange');
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Discover',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.play_lesson_outlined),
+            selectedIcon: Icon(Icons.play_lesson),
+            label: 'My Learning',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.swap_horiz_outlined),
+            selectedIcon: Icon(Icons.swap_horiz),
+            label: 'Skill Exchange',
+          ),
+        ],
       ),
       body: _provider.isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F766E)))
