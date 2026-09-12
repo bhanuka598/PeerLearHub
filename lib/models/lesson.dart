@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum LessonCategory {
   programming,
   design,
@@ -25,6 +27,12 @@ enum LessonStatus {
   draft,
   active,
   inactive,
+}
+
+enum ExchangeType {
+  free,
+  paid,
+  skillExchange,
 }
 
 class LessonAvailability {
@@ -79,6 +87,9 @@ class Lesson {
     required this.updatedAt,
     this.price,
     this.imageUrl,
+    this.learningOutcomes = const [],
+    this.exchangeType = ExchangeType.paid,
+    this.learningMaterials = const [],
   });
 
   final String id;
@@ -95,6 +106,9 @@ class Lesson {
   final bool isFree;
   final LessonStatus status;
   final String? imageUrl;
+  final List<String> learningOutcomes;
+  final ExchangeType exchangeType;
+  final List<String> learningMaterials;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -113,6 +127,9 @@ class Lesson {
     bool? isFree,
     LessonStatus? status,
     String? imageUrl,
+    List<String>? learningOutcomes,
+    ExchangeType? exchangeType,
+    List<String>? learningMaterials,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearPrice = false,
@@ -133,6 +150,9 @@ class Lesson {
       isFree: isFree ?? this.isFree,
       status: status ?? this.status,
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      learningOutcomes: learningOutcomes ?? this.learningOutcomes,
+      exchangeType: exchangeType ?? this.exchangeType,
+      learningMaterials: learningMaterials ?? this.learningMaterials,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -154,8 +174,34 @@ class Lesson {
       'isFree': isFree,
       'status': status.name,
       'imageUrl': imageUrl,
+      'learningOutcomes': learningOutcomes,
+      'exchangeType': exchangeType.name,
+      'learningMaterials': learningMaterials,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'providerId': providerId,
+      'title': title,
+      'description': description,
+      'category': category.name,
+      'skillLevel': skillLevel.name,
+      'duration': duration,
+      'lessonType': lessonType.name,
+      'availability': availability.toMap(),
+      'location': location,
+      'price': price,
+      'isFree': isFree,
+      'status': status.name,
+      'imageUrl': imageUrl,
+      'learningOutcomes': learningOutcomes,
+      'exchangeType': exchangeType.name,
+      'learningMaterials': learningMaterials,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
 
@@ -177,8 +223,69 @@ class Lesson {
       isFree: map['isFree'] as bool? ?? true,
       status: LessonStatus.values.byName(map['status'] as String),
       imageUrl: map['imageUrl'] as String?,
+      learningOutcomes: List<String>.from(map['learningOutcomes'] as List? ?? []),
+      exchangeType: ExchangeType.values.firstWhere(
+        (e) => e.name == map['exchangeType'],
+        orElse: () => ExchangeType.paid,
+      ),
+      learningMaterials:
+          List<String>.from(map['learningMaterials'] as List? ?? []),
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
     );
+  }
+
+  factory Lesson.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Lesson.fromDocData(doc.id, data);
+  }
+
+  factory Lesson.fromDocData(String id, Map<String, dynamic> data) {
+    return Lesson(
+      id: id,
+      providerId: data['providerId'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      category: LessonCategory.values.firstWhere(
+        (e) => e.name == data['category'],
+        orElse: () => LessonCategory.other,
+      ),
+      skillLevel: SkillLevel.values.firstWhere(
+        (e) => e.name == data['skillLevel'],
+        orElse: () => SkillLevel.beginner,
+      ),
+      duration: data['duration'] as String? ?? '',
+      lessonType: LessonType.values.firstWhere(
+        (e) => e.name == data['lessonType'],
+        orElse: () => LessonType.online,
+      ),
+      availability: LessonAvailability.fromMap(
+        Map<String, dynamic>.from(data['availability'] as Map? ?? {}),
+      ),
+      location: data['location'] as String? ?? '',
+      price: (data['price'] as num?)?.toDouble(),
+      isFree: data['isFree'] as bool? ?? true,
+      status: LessonStatus.values.firstWhere(
+        (e) => e.name == data['status'],
+        orElse: () => LessonStatus.draft,
+      ),
+      imageUrl: data['imageUrl'] as String?,
+      learningOutcomes:
+          List<String>.from(data['learningOutcomes'] as List? ?? []),
+      exchangeType: ExchangeType.values.firstWhere(
+        (e) => e.name == data['exchangeType'],
+        orElse: () => ExchangeType.paid,
+      ),
+      learningMaterials:
+          List<String>.from(data['learningMaterials'] as List? ?? []),
+      createdAt: _parseDate(data['createdAt']),
+      updatedAt: _parseDate(data['updatedAt']),
+    );
+  }
+
+  static DateTime _parseDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.parse(value);
+    return DateTime.now();
   }
 }

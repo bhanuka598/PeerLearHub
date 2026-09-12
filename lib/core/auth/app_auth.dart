@@ -12,6 +12,25 @@ class AppAuth extends ChangeNotifier {
 
   AppUserRole? get currentRole => _currentRole;
 
+  static const _skillProviderRoutes = [
+    '/skill-provider',
+    '/skill-provider/my-lessons',
+    '/skill-provider/create',
+    '/skill-provider/edit',
+    '/skill-provider/lesson',
+    '/skill-provider/bookings',
+    '/skill-provider/booking',
+    '/skill-provider/reschedule',
+    '/skill-provider/messages',
+    '/skill-provider/sessions',
+    '/skill-provider/session',
+    '/skill-provider/reviews',
+    '/skill-provider/profile',
+    '/notifications',
+    '/learning/sessions',
+    '/learning/session-feedback',
+  ];
+
   void setRole(AppUserRole role) {
     _currentRole = role;
     notifyListeners();
@@ -25,11 +44,11 @@ class AppAuth extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      // Fetch user role from backend
+      // Fetch user role from backend — do not hardcode student
       try {
         final loginData = await AuthService.instance.loginWithRole();
         final roleString = loginData['user']['role'] as String?;
-        
+
         switch (roleString) {
           case 'moderator':
             setRole(AppUserRole.moderator);
@@ -54,8 +73,7 @@ class AppAuth extends ChangeNotifier {
   Future<bool> registerAsModerator() async {
     try {
       final userData = await AuthService.instance.registerAsModerator();
-      
-      // Update role based on response
+
       final roleString = userData['role'] as String?;
       switch (roleString) {
         case 'moderator':
@@ -64,7 +82,7 @@ class AppAuth extends ChangeNotifier {
         default:
           setRole(AppUserRole.student);
       }
-      
+
       return true;
     } catch (e) {
       debugPrint('Failed to register as moderator: $e');
@@ -95,9 +113,10 @@ class AppAuth extends ChangeNotifier {
 
   bool canAccess(String location) {
     final cleanLocation = location.split('?').first;
-    final allowedForGuest = [
+    const allowedForGuest = [
       '/',
       '/loading',
+      '/welcome',
       '/login',
       '/register',
       '/moderation/register',
@@ -110,17 +129,6 @@ class AppAuth extends ChangeNotifier {
 
     switch (_currentRole) {
       case AppUserRole.student:
-        return cleanLocation == '/learning' ||
-            cleanLocation == '/learning/my-courses' ||
-            cleanLocation == '/learning/course' ||
-            cleanLocation == '/learning/lesson' ||
-            cleanLocation == '/learning/quiz' ||
-            cleanLocation == '/learning/assignment' ||
-            cleanLocation == '/skill-exchange' ||
-            cleanLocation == '/skill-provider' ||
-            cleanLocation == '/skill-provider/my-lessons' ||
-            cleanLocation == '/skill-provider/create' ||
-            cleanLocation == '/skill-provider/edit';
       case AppUserRole.teacher:
         return cleanLocation == '/learning' ||
             cleanLocation == '/learning/my-courses' ||
@@ -128,15 +136,16 @@ class AppAuth extends ChangeNotifier {
             cleanLocation == '/learning/lesson' ||
             cleanLocation == '/learning/quiz' ||
             cleanLocation == '/learning/assignment' ||
+            cleanLocation == '/learning/provider-lesson' ||
+            cleanLocation == '/profile' ||
             cleanLocation == '/skill-exchange' ||
-            cleanLocation == '/skill-provider' ||
-            cleanLocation == '/skill-provider/my-lessons' ||
-            cleanLocation == '/skill-provider/create' ||
-            cleanLocation == '/skill-provider/edit';
+            _skillProviderRoutes.contains(cleanLocation);
       case AppUserRole.moderator:
-        return cleanLocation == '/moderation';
+        return cleanLocation == '/moderation' ||
+            cleanLocation == '/profile';
       case AppUserRole.admin:
-        return cleanLocation == '/moderation';
+        return cleanLocation == '/moderation' ||
+            cleanLocation == '/profile';
       case null:
         return false;
     }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/app_auth.dart';
 import '../core/auth/auth_service.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/auth/auth_ui.dart';
 import '../widgets/social_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -52,23 +53,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final password = _passwordController.text;
-
     setState(() => _isSubmitting = true);
     try {
       await AuthService.instance.signInWithEmail(
         email: _emailController.text,
-        password: password,
+        password: _passwordController.text,
       );
       if (!mounted) {
         return;
       }
-      
-      // Fetch user role from backend
+
       try {
         final loginData = await AuthService.instance.loginWithRole();
         final roleString = loginData['user']['role'] as String?;
-        
+
         switch (roleString) {
           case 'moderator':
             AppAuth.instance.setRole(AppUserRole.moderator);
@@ -82,11 +80,10 @@ class _LoginScreenState extends State<LoginScreen> {
           default:
             AppAuth.instance.setRole(AppUserRole.student);
         }
-      } catch (e) {
-        // Fallback to student role if backend fails
+      } catch (_) {
         AppAuth.instance.setRole(AppUserRole.student);
       }
-      
+
       context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {
@@ -138,200 +135,148 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  InputDecoration _fieldDecoration({
+    required String label,
+    required String hint,
+    required IconData icon,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: AppTheme.primaryColor),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: const Color(0xFFF8FAFB),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE6EEF0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE6EEF0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.8),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  onPressed: () => context.canPop() ? context.pop() : null,
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.iconBackground,
-                    foregroundColor: AppTheme.textPrimary,
-                  ),
+      body: AuthFormShell(
+        leading: AuthBackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
+        ),
+        title: 'Welcome back',
+        subtitle:
+            'Sign in to continue learning and sharing skills with your community.',
+        footer: AuthFooterLink(
+          prompt: "Don't have an account?",
+          actionLabel: 'Sign up',
+          onTap: () => context.go('/register'),
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: _fieldDecoration(
+                  label: 'Email address',
+                  hint: 'you@example.com',
+                  icon: Icons.email_outlined,
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Welcome Back!',
-                  style: textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Log in to continue learning and sharing skills.',
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          hintText: 'Enter your email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: _validateEmail,
-                      ),
-                      const SizedBox(height: 18),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _login(),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: 'Enter your password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(
-                                () => _obscurePassword = !_obscurePassword,
-                              );
-                            },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: (value) {
-                          if ((value ?? '').isEmpty) {
-                            return 'Enter your password';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => context.go('/forgot-password'),
-                          child: const Text('Forgot Password?'),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _isSubmitting ? null : _login,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'Log In',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 26),
-                Row(
-                  children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'OR',
-                        style: textTheme.labelLarge?.copyWith(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                SocialAuthButton(
-                  label: 'Continue with Google',
-                  icon: Icons.g_mobiledata_rounded,
-                  isLoading: _isGoogleSubmitting,
-                  onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
-                ),
-                const SizedBox(height: 12),
-                SocialAuthButton(
-                  label: 'Continue with Apple',
-                  icon: Icons.apple,
-                  onPressed: () {},
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: RichText(
-                    text: TextSpan(
-                      text: "Don't have an account? ",
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                      children: [
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: GestureDetector(
-                            onTap: () => context.go('/register'),
-                            child: Text(
-                              'Sign Up',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.primaryColor,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                validator: _validateEmail,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _login(),
+                decoration: _fieldDecoration(
+                  label: 'Password',
+                  hint: 'Enter your password',
+                  icon: Icons.lock_outline,
+                  suffix: IconButton(
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.go('/moderation/register'),
-                    child: Text(
-                      'Register as Moderator',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                validator: (value) {
+                  if ((value ?? '').isEmpty) {
+                    return 'Enter your password';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => context.go('/forgot-password'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: const Text(
+                    'Forgot password?',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              AuthPrimaryButton(
+                label: 'Sign in',
+                isLoading: _isSubmitting,
+                onPressed: _isSubmitting ? null : _login,
+              ),
+              const SizedBox(height: 24),
+              const AuthSectionDivider(),
+              const SizedBox(height: 20),
+              SocialAuthButton(
+                label: 'Continue with Google',
+                icon: Icons.g_mobiledata_rounded,
+                isLoading: _isGoogleSubmitting,
+                onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
+              ),
+              const SizedBox(height: 12),
+              SocialAuthButton(
+                label: 'Continue with Apple',
+                icon: Icons.apple,
+                onPressed: () {},
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/moderation/register'),
+                  child: const Text(
+                    'Register as Moderator',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
