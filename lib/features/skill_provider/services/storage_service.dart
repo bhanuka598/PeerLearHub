@@ -1,17 +1,17 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
 
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
-/// Firebase Storage helper for lesson thumbnails and materials.
+/// Persists lesson thumbnails and profile photos as compact data URLs.
+///
+/// `firebase_storage` is not a project dependency, and web Storage uploads
+/// hang without a CORS policy. Callers keep the same API; files stay inline.
 class StorageService {
   StorageService._();
 
   static final StorageService instance = StorageService._();
   static bool useMockUpload = false;
-
-  static const _uploadTimeout = Duration(seconds: 12);
 
   Future<String?> uploadLessonImage({
     required String lessonId,
@@ -23,24 +23,7 @@ class StorageService {
       return 'https://placeholder.peerlearnhub.com/lessons/$lessonId/$fileName';
     }
 
-    // Flutter web Storage uploads retry forever when the bucket has no CORS
-    // policy. Persist a compact data URL instead so the picker never hangs.
-    if (kIsWeb) {
-      return _toPersistableThumbnail(bytes, fileName);
-    }
-
-    try {
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('lessons/$lessonId/images/$fileName');
-      await ref
-          .putData(bytes, SettableMetadata(contentType: _contentType(fileName)))
-          .timeout(_uploadTimeout);
-      return await ref.getDownloadURL().timeout(_uploadTimeout);
-    } catch (e) {
-      debugPrint('Storage upload failed: $e');
-      return _toPersistableThumbnail(bytes, fileName);
-    }
+    return _toPersistableThumbnail(bytes, fileName);
   }
 
   Future<String?> uploadProfileAvatar({
@@ -71,16 +54,9 @@ class StorageService {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       return 'https://placeholder.peerlearnhub.com/lessons/$lessonId/materials/$fileName';
     }
-    try {
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('lessons/$lessonId/materials/$fileName');
-      await ref.putData(bytes).timeout(_uploadTimeout);
-      return await ref.getDownloadURL().timeout(_uploadTimeout);
-    } catch (e) {
-      debugPrint('Material upload failed: $e');
-      return null;
-    }
+
+    debugPrint('Material upload skipped: Firebase Storage is not configured.');
+    return null;
   }
 
   String _contentType(String fileName) {

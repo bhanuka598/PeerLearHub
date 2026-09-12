@@ -134,7 +134,7 @@ class RouterClass {
       ),
       GoRoute(
         path: '/learning/quiz',
-        builder: (context, state) => {
+        builder: (context, state) {
           final quiz = state.extra;
           return quiz is LearningQuiz
               ? QuizScreen(quiz: quiz)
