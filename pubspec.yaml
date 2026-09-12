@@ -74,6 +74,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/branding/peerlearnhub-icon.png
     - assets/images/moderation_hero.png
     - assets/images/safety_hero.png
     - assets/images/profile_hero.png
