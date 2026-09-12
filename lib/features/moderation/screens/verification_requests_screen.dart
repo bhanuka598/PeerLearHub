@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../models/verification_request.dart';
 import '../services/verification_service.dart';
+import '../widgets/moderator_bottom_nav.dart';
 import 'verification_details_screen.dart';
-import 'package:intl/intl.dart';
 
 class VerificationRequestsScreen extends StatefulWidget {
   final String? initialFilter;
@@ -82,6 +84,7 @@ class _VerificationRequestsScreenState
           ),
         ),
       ),
+      bottomNavigationBar: const ModeratorBottomNav(currentIndex: 1),
       body: Column(
         children: [
           // Filter Chips
@@ -118,7 +121,7 @@ class _VerificationRequestsScreenState
               ),
             ),
           ),
-          
+
           // List
           Expanded(
             child: StreamBuilder<List<VerificationRequest>>(

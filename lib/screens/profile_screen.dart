@@ -26,46 +26,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      setState(() => _loading = false);
+      return;
+    }
 
     try {
-      // Load user data
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        setState(() {
-          _userData = userDoc.data() as Map<String, dynamic>;
-        });
-      }
+      final userDocRef = _firestore.collection('users').doc(user.uid);
+      final userDoc = await userDocRef.get();
+      final userDocument = userDoc.data() ?? <String, dynamic>{};
 
-      // Load completed assignments (certificates)
-      final assignmentsSnapshot = await _firestore
-          .collection('users')
-          .doc(user.uid)
+      final mergedUserData = <String, dynamic>{
+        'uid': user.uid,
+        'fullName': userDocument['fullName'] ?? user.displayName ?? 'User',
+        'email': userDocument['email'] ?? user.email ?? 'No email provided',
+        'role': userDocument['role'] ?? 'student',
+        'learningGoal': userDocument['learningGoal'] ?? 'No learning goal set',
+        'learningPoints': userDocument['learningPoints'] ?? 0,
+        'photoURL': userDocument['photoURL'] ??
+            userDocument['profileImageUrl'] ??
+            user.photoURL,
+        'bio': userDocument['bio'] ?? '',
+        'location': userDocument['location'] ?? '',
+        'phoneNumber': userDocument['phoneNumber'] ?? '',
+        'createdAt': userDocument['createdAt'],
+      };
+
+      final assignmentsSnapshot = await userDocRef
           .collection('assignments')
           .where('status', isEqualTo: 'submitted')
           .get();
 
       final certificates = <Map<String, dynamic>>[];
-      int totalPoints = 0;
-
-      for (var doc in assignmentsSnapshot.docs) {
+      for (final doc in assignmentsSnapshot.docs) {
         final data = doc.data();
-        // You could add points logic here, e.g., 100 points per completed course
-        totalPoints += 100;
         certificates.add({
-          'courseId': data['courseId'],
-          'description': data['description'],
+          'courseId': data['courseId'] ?? 'Course',
+          'description': data['description'] ?? 'Submitted assignment',
           'githubUrl': data['githubUrl'],
           'submittedAt': data['submittedAt'],
         });
       }
 
+      final totalPoints = (mergedUserData['learningPoints'] is num)
+          ? (mergedUserData['learningPoints'] as num).toInt()
+          : 0;
+
       setState(() {
+        _userData = mergedUserData;
         _certificates = certificates;
         _totalPoints = totalPoints;
         _loading = false;
       });
     } catch (e) {
+      debugPrint('Failed to load profile: $e');
       setState(() {
         _loading = false;
       });
@@ -82,6 +96,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final displayName = _userData?['fullName'] ?? user?.displayName ?? 'User';
+    final email = _userData?['email'] ?? user?.email ?? 'No email provided';
+    final role = (_userData?['role'] ?? 'student').toString();
+    final learningGoal = _userData?['learningGoal'] ?? 'No learning goal set';
+    final photoUrl = _userData?['photoURL'] as String? ?? user?.photoURL;
+    final memberSince = _userData?['createdAt'];
+    final bio = _userData?['bio']?.toString();
+    final location = _userData?['location']?.toString();
 
     return Scaffold(
       appBar: AppBar(
@@ -95,7 +117,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // User Info Card
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -105,12 +126,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             children: [
                               CircleAvatar(
-                                radius: 40,
-                                backgroundImage: user?.photoURL != null
-                                    ? NetworkImage(user!.photoURL!)
-                                    : null,
-                                child: user?.photoURL == null
-                                    ? const Icon(Icons.person, size: 40)
+                                radius: 42,
+                                backgroundImage:
+                                    photoUrl != null && photoUrl.isNotEmpty
+                                        ? NetworkImage(photoUrl)
+                                        : null,
+                                child: photoUrl == null || photoUrl.isEmpty
+                                    ? const Icon(Icons.person, size: 42)
                                     : null,
                               ),
                               const SizedBox(width: 16),
@@ -119,13 +141,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _userData?['fullName'] ?? user?.displayName ?? 'User',
+                                      displayName,
                                       style: Theme.of(context).textTheme.titleLarge,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      user?.email ?? '',
+                                      email,
                                       style: Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primaryContainer,
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        role.toUpperCase(),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -133,17 +177,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            'Learning Goal: ${_userData?['learningGoal'] ?? 'Not set'}',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          if (bio != null && bio.isNotEmpty) ...[
+                            Text(
+                              'About',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(bio),
+                            const SizedBox(height: 12),
+                          ],
+                          _InfoRow(
+                            icon: Icons.flag_outlined,
+                            label: 'Learning goal',
+                            value: learningGoal,
                           ),
+                          if (location != null && location.isNotEmpty)
+                            _InfoRow(
+                              icon: Icons.location_on_outlined,
+                              label: 'Location',
+                              value: location,
+                            ),
+                          if (memberSince != null)
+                            _InfoRow(
+                              icon: Icons.calendar_today_outlined,
+                              label: 'Member since',
+                              value: _formatDate(memberSince),
+                            ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Points Card
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -154,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Total Points',
+                                'Learning Points',
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
@@ -168,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                           Icon(
-                            Icons.star,
+                            Icons.stars_rounded,
                             size: 48,
                             color: Theme.of(context).colorScheme.primary,
                           ),
@@ -178,9 +243,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Certificates Section
                   Text(
-                    'Earned Certificates',
+                    'Submitted Assignments',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
@@ -188,7 +252,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const Card(
                       child: Padding(
                         padding: EdgeInsets.all(16),
-                        child: Text('No certificates earned yet. Complete courses to earn certificates!'),
+                        child: Text(
+                          'No submitted assignments yet. Complete courses and submit work to see them here.',
+                        ),
                       ),
                     )
                   else
@@ -208,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'Course: ${cert['courseId']}',
+                                        cert['courseId'] ?? 'Assignment',
                                         style: Theme.of(context).textTheme.titleMedium,
                                       ),
                                     ),
@@ -216,11 +282,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  cert['description'] ?? 'No description',
+                                  cert['description'] ?? 'No description provided',
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                                 const SizedBox(height: 8),
-                                if (cert['githubUrl'] != null)
+                                if (cert['githubUrl'] != null &&
+                                    cert['githubUrl'].toString().isNotEmpty)
                                   Row(
                                     children: [
                                       const Icon(Icons.link, size: 16),
@@ -236,7 +303,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Completed: ${_formatDate(cert['submittedAt'])}',
+                                  'Submitted: ${_formatDate(cert['submittedAt'])}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -246,7 +313,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Sign Out Button
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
@@ -271,5 +337,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return date.toString().split(' ')[0];
     }
     return 'Unknown date';
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: Theme.of(context).textTheme.bodyMedium,
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(text: value),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

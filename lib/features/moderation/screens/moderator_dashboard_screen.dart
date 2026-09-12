@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/navigation_card.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/stat_card.dart';
+import 'package:peer_learn_hub/features/moderation/widgets/moderator_bottom_nav.dart';
 import '../../../core/constants/app_colors.dart';
 import '../services/verification_service.dart';
 import '../services/moderation_service.dart';
@@ -296,11 +297,84 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                         ).then((_) => _loadStatistics());
                       },
                     ),
+
+                    NavigationCard(
+                      title: 'Community Safety',
+                      subtitle: 'Monitor trust scores and safety trends',
+                      icon: Icons.security_outlined,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CommunitySafetyScreen(),
+                          ),
+                        ).then((_) => _loadStatistics());
+                      },
+                    ),
+
+                    NavigationCard(
+                      title: 'Moderation Actions',
+                      subtitle: 'Review warnings, bans, and moderator decisions',
+                      icon: Icons.gavel_outlined,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ModerationActionsScreen(),
+                          ),
+                        ).then((_) => _loadStatistics());
+                      },
+                    ),
                     
                     const SizedBox(height: 24),
                   ],
                 ),
               ),
+      ),
+      bottomNavigationBar: ModeratorBottomNav(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          if (index == _selectedIndex) return;
+
+          setState(() => _selectedIndex = index);
+
+          switch (index) {
+            case 0:
+              return;
+            case 1:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const VerificationRequestsScreen(),
+                ),
+              );
+              return;
+            case 2:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ReportsScreen(),
+                ),
+              );
+              return;
+            case 3:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ActivityLogScreen(),
+                ),
+              );
+              return;
+            case 4:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ModeratorProfileScreen(),
+                ),
+              );
+              return;
+          }
+        },
       ),
     );
   }

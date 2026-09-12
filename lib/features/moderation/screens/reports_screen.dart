@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../models/moderation_report.dart';
 import '../services/moderation_service.dart';
+import '../widgets/moderator_bottom_nav.dart';
 import 'report_details_screen.dart';
-import 'package:intl/intl.dart';
 
 class ReportsScreen extends StatefulWidget {
   final String? initialFilter;
@@ -115,6 +117,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const ModeratorBottomNav(currentIndex: 2),
       body: Column(
         children: [
           // Filter Chips
@@ -151,7 +154,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
             ),
           ),
-          
+
           // List
           Expanded(
             child: StreamBuilder<List<ModerationReport>>(

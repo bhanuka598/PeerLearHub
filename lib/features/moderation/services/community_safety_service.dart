@@ -35,7 +35,7 @@ class CommunitySafetyService {
       return trustIndex.clamp(0, 100);
     } catch (e) {
       print('Error calculating trust index: $e');
-      return 87.0; // Default value
+      return 0.0;
     }
   }
 
@@ -43,15 +43,19 @@ class CommunitySafetyService {
   Future<Map<String, int>> getTrustScoreDistribution() async {
     try {
       final usersSnapshot = await _firestore.collection('users').get();
-      
+
       int excellent = 0;
       int good = 0;
       int fair = 0;
       int poor = 0;
 
       for (var doc in usersSnapshot.docs) {
-        final trustScore = (doc.data()['trustScore'] as num?)?.toInt() ?? 80;
-        
+        final trustScore = (doc.data()['trustScore'] as num?)?.toInt();
+
+        if (trustScore == null) {
+          continue;
+        }
+
         if (trustScore >= 90) {
           excellent++;
         } else if (trustScore >= 75) {
@@ -98,7 +102,7 @@ class CommunitySafetyService {
       return volumes;
     } catch (e) {
       print('Error getting report volume: $e');
-      return [5, 8, 6, 12, 9, 7, 10]; // Default mock data
+      return List.filled(7, 0);
     }
   }
 

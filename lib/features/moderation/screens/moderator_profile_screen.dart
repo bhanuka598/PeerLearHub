@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/constants/app_colors.dart';
+import '../widgets/moderator_bottom_nav.dart';
 
 class ModeratorProfileScreen extends StatelessWidget {
   const ModeratorProfileScreen({super.key});
@@ -8,6 +10,7 @@ class ModeratorProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      bottomNavigationBar: const ModeratorBottomNav(currentIndex: 4),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,

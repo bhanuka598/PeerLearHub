@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../../../core/constants/app_colors.dart';
+import '../models/moderation_activity.dart';
 import '../services/activity_log_service.dart';
 import '../services/auth_service.dart';
-import '../models/moderation_activity.dart';
-import 'package:intl/intl.dart';
+import '../widgets/moderator_bottom_nav.dart';
 
 class ActivityLogScreen extends StatefulWidget {
   const ActivityLogScreen({super.key});
@@ -72,6 +74,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: const ModeratorBottomNav(currentIndex: 3),
       body: Column(
         children: [
           // Stats Header

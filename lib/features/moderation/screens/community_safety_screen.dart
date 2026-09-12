@@ -234,11 +234,36 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildDistributionBar('High (72%)', 0.72, Colors.green),
-                  const SizedBox(height: 12),
-                  _buildDistributionBar('Med (21%)', 0.21, Colors.orange),
-                  const SizedBox(height: 12),
-                  _buildDistributionBar('Low (7%)', 0.07, Colors.red),
+                  if ((_trustDistribution['total'] ?? 0) == 0)
+                    const Text(
+                      'No trust data available yet.',
+                      style: TextStyle(color: Colors.grey),
+                    )
+                  else ...[
+                    _buildDistributionBar(
+                      'Excellent (${_percentage('excellent')})',
+                      _distributionValue('excellent'),
+                      Colors.green,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDistributionBar(
+                      'Good (${_percentage('good')})',
+                      _distributionValue('good'),
+                      Colors.orange,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDistributionBar(
+                      'Fair (${_percentage('fair')})',
+                      _distributionValue('fair'),
+                      Colors.amber,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDistributionBar(
+                      'Poor (${_percentage('poor')})',
+                      _distributionValue('poor'),
+                      Colors.red,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -274,23 +299,53 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Container(
-                          height: 100,
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.bar_chart,
-                            size: 48,
-                            color: Colors.orange[300],
+                        if (_reportVolume.isEmpty)
+                          const Text(
+                            'No report volume data yet.',
+                            style: TextStyle(color: Colors.grey),
+                          )
+                        else ...[
+                          SizedBox(
+                            height: 100,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: _reportVolume.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final value = entry.value;
+                                final maxValue = _reportVolume.reduce((a, b) => a > b ? a : b);
+                                final height = maxValue == 0 ? 0.0 : (value / maxValue) * 100;
+                                return Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(
+                                      left: index == 0 ? 0 : 4,
+                                      right: index == _reportVolume.length - 1 ? 0 : 4,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Container(
+                                          height: height.clamp(8.0, 100.0),
+                                          width: double.infinity,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryTeal.withOpacity(0.75),
+                                            borderRadius: const BorderRadius.vertical(
+                                              top: Radius.circular(6),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${7 - (_reportVolume.length - index - 1)}d',
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '+24% rise this week',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -322,9 +377,19 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _buildCategoryItem('Spam', '64%'),
-                        const SizedBox(height: 8),
-                        _buildCategoryItem('Harassment', '28%'),
+                        if (_topCategories.isEmpty)
+                          const Text(
+                            'No categories reported yet.',
+                            style: TextStyle(color: Colors.grey),
+                          )
+                        else ...[
+                          ..._topCategories.entries.map(
+                            (entry) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _buildCategoryItem(entry.key, '${entry.value}'),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -359,19 +424,22 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildAlertItem(
-                    'IP Flood Detected',
-                    'Multiple account creations from Colombo region',
-                    Colors.red,
-                    'URGENT',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildAlertItem(
-                    'API Rate Limiting Hit',
-                    'Verification service hit 80% threshold',
-                    Colors.orange,
-                    'STABLE',
-                  ),
+                  if (_alerts.isEmpty)
+                    const Text(
+                      'No active safety alerts.',
+                      style: TextStyle(color: Colors.grey),
+                    )
+                  else ...[
+                    ..._alerts.map((alert) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildAlertItem(
+                            alert['title'] as String? ?? 'Safety alert',
+                            alert['description'] as String? ?? '',
+                            (alert['type'] == 'critical') ? Colors.red : Colors.orange,
+                            (alert['type'] == 'critical') ? 'CRITICAL' : 'ACTIVE',
+                          ),
+                        )),
+                  ],
                 ],
               ),
             ),
@@ -379,6 +447,21 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
         ),
       ),
     );
+  }
+
+  double _distributionValue(String key) {
+    final total = (_trustDistribution['total'] ?? 0);
+    if (total == 0) return 0;
+    final count = (_trustDistribution[key] ?? 0);
+    return count / total;
+  }
+
+  String _percentage(String key) {
+    final total = (_trustDistribution['total'] ?? 0);
+    if (total == 0) return '0%';
+    final count = (_trustDistribution[key] ?? 0);
+    final percent = ((count / total) * 100).round();
+    return '$percent%';
   }
 
   Widget _buildDistributionBar(String label, double value, Color color) {
@@ -410,7 +493,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: value,
+            value: value.clamp(0.0, 1.0),
             minHeight: 8,
             backgroundColor: Colors.grey[200],
             valueColor: AlwaysStoppedAnimation<Color>(color),
