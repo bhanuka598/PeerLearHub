@@ -5,36 +5,27 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/app_auth.dart';
 import '../core/auth/auth_service.dart';
 import '../core/theme/app_theme.dart';
-import '../widgets/social_auth_button.dart';
 
-class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+class ModeratorRegisterScreen extends StatefulWidget {
+  const ModeratorRegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  State<ModeratorRegisterScreen> createState() => _ModeratorRegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _adminKeyController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _obscureAdminKey = true;
   bool _isSubmitting = false;
-  bool _isGoogleSubmitting = false;
   bool _agreedToTerms = false;
-  String _selectedGoal = 'Learn New Skills';
-
-  final List<String> _learningGoals = [
-    'Learn New Skills',
-    'Improve Existing Skills',
-    'Academic Learning',
-    'Prepare for a Career',
-    'Share My Skills',
-  ];
 
   @override
   void dispose() {
@@ -42,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _adminKeyController.dispose();
     super.dispose();
   }
 
@@ -85,27 +77,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  void _showError(
-    String message, {
-    String? actionLabel,
-    VoidCallback? onAction,
-  }) {
+  String? _validateAdminKey(String? value) {
+    if ((value ?? '').trim().isEmpty) {
+      return 'Please enter the admin key';
+    }
+    return null;
+  }
+
+  void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade700,
-        action: actionLabel == null || onAction == null
-            ? null
-            : SnackBarAction(
-                label: actionLabel,
-                textColor: Colors.white,
-                onPressed: onAction,
-              ),
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
     );
   }
 
-  Future<void> _register() async {
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green.shade700),
+    );
+  }
+
+  Future<void> _registerModerator() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -117,49 +108,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      // First register the user normally
       await AuthService.instance.registerWithEmail(
         fullName: _fullNameController.text,
         email: _emailController.text,
         password: _passwordController.text,
-        learningGoal: _selectedGoal,
+        learningGoal: 'Moderation and Content Management',
       );
+      
       if (!mounted) {
         return;
       }
-      
-      // Fetch user role from backend
-      try {
-        final loginData = await AuthService.instance.loginWithRole();
-        final roleString = loginData['user']['role'] as String?;
-        
-        switch (roleString) {
-          case 'moderator':
-            AppAuth.instance.setRole(AppUserRole.moderator);
-            break;
-          case 'teacher':
-            AppAuth.instance.setRole(AppUserRole.teacher);
-            break;
-          case 'admin':
-            AppAuth.instance.setRole(AppUserRole.admin);
-            break;
-          default:
-            AppAuth.instance.setRole(AppUserRole.student);
+
+      // Then register as moderator with admin key
+      final success = await AppAuth.instance.registerAsModerator(
+        adminKey: _adminKeyController.text.trim(),
+      );
+
+      if (success && mounted) {
+        _showSuccess('Successfully registered as moderator!');
+        // Small delay to show success message
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          context.go(AppAuth.instance.getHomeRoute());
         }
-      } catch (e) {
-        // Fallback to student role if backend fails
-        AppAuth.instance.setRole(AppUserRole.student);
+      } else if (mounted) {
+        _showError('Failed to register as moderator. Please check your admin key.');
       }
-      
-      context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {
-        _showError(
-          AuthService.instance.authErrorMessage(error),
-          actionLabel: error.code == 'email-already-in-use' ? 'Log in' : null,
-          onAction: error.code == 'email-already-in-use'
-              ? () => context.go('/login')
-              : null,
-        );
+        _showError(AuthService.instance.authErrorMessage(error));
       }
     } on Exception catch (error) {
       if (mounted) {
@@ -168,41 +146,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
-      }
-    }
-  }
-
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isGoogleSubmitting = true);
-
-    try {
-      final success = await AppAuth.instance.signInWithGoogle();
-      if (!mounted) {
-        return;
-      }
-
-      if (success) {
-        context.go(
-          AppAuth.instance.currentRole == null
-              ? '/select-role'
-              : AppAuth.instance.getHomeRoute(),
-        );
-      } else {
-        _showError(
-          AuthService.instance.lastError ??
-              'Google sign-in failed. Please try again.',
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        _showError(
-          AuthService.instance.lastError ??
-              'Google sign-in failed. Please try again.',
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isGoogleSubmitting = false);
       }
     }
   }
@@ -229,16 +172,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  'Create Your Account',
-                  style: textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.admin_panel_settings,
+                      size: 32,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Moderator Registration',
+                      style: textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Join PeerLearnHub and start your learning journey.',
+                  'Register as a moderator to manage content and user reports.',
                   style: textTheme.bodyLarge?.copyWith(
                     color: AppTheme.textSecondary,
                   ),
@@ -298,8 +251,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _register(),
+                        textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
                           labelText: 'Confirm Password',
                           hintText: 'Confirm your password',
@@ -320,48 +272,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         validator: _validateConfirmPassword,
                       ),
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'What do you want to achieve?',
-                          style: textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
+                      const SizedBox(height: 18),
+                      TextFormField(
+                        controller: _adminKeyController,
+                        obscureText: _obscureAdminKey,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _registerModerator(),
+                        decoration: InputDecoration(
+                          labelText: 'Admin Key',
+                          hintText: 'Enter the admin key',
+                          prefixIcon: const Icon(Icons.key),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(
+                                () => _obscureAdminKey = !_obscureAdminKey,
+                              );
+                            },
+                            icon: Icon(
+                              _obscureAdminKey
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
                           ),
                         ),
+                        validator: _validateAdminKey,
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _learningGoals.map((goal) {
-                          final selected = _selectedGoal == goal;
-                          return ChoiceChip(
-                            label: Text(goal),
-                            selected: selected,
-                            onSelected: (_) =>
-                                setState(() => _selectedGoal = goal),
-                            selectedColor: AppTheme.primaryColor.withValues(
-                              alpha: 0.12,
-                            ),
-                            labelStyle: TextStyle(
-                              color: selected
-                                  ? AppTheme.primaryDark
-                                  : AppTheme.textSecondary,
-                              fontWeight: selected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                            side: BorderSide(
-                              color: selected
-                                  ? AppTheme.primaryColor
-                                  : Colors.grey.shade300,
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
@@ -379,7 +315,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: _isSubmitting ? null : _register,
+                          onPressed: _isSubmitting ? null : _registerModerator,
                           style: FilledButton.styleFrom(
                             backgroundColor: AppTheme.primaryColor,
                             foregroundColor: Colors.white,
@@ -400,77 +336,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 )
                               : const Text(
-                                  'Create Account',
+                                  'Register as Moderator',
                                   style: TextStyle(fontWeight: FontWeight.w700),
                                 ),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'OR',
-                              style: textTheme.labelLarge?.copyWith(
-                                color: AppTheme.textSecondary,
-                                fontWeight: FontWeight.w700,
-                              ),
+                      Center(
+                        child: RichText(
+                          text: TextSpan(
+                            text: 'Already have an account? ',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textSecondary,
                             ),
-                          ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      SocialAuthButton(
-                        label: 'Continue with Google',
-                        icon: Icons.g_mobiledata_rounded,
-                        isLoading: _isGoogleSubmitting,
-                        onPressed: _isGoogleSubmitting
-                            ? null
-                            : _signInWithGoogle,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: RichText(
-                    text: TextSpan(
-                      text: 'Already have an account? ',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                      children: [
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: GestureDetector(
-                            onTap: () => context.go('/login'),
-                            child: Text(
-                              'Log In',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.primaryColor,
-                                fontWeight: FontWeight.w700,
+                            children: [
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: GestureDetector(
+                                  onTap: () => context.go('/login'),
+                                  child: Text(
+                                    'Log In',
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color: AppTheme.primaryColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.go('/moderation/register'),
-                    child: Text(
-                      'Register as Moderator',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],

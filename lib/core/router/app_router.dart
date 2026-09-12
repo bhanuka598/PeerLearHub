@@ -1,6 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/core/auth/app_auth.dart';
-import 'package:peer_learn_hub/features/moderation/screens/moderator_dashboard_screen.dart';
+import 'package:peer_learn_hub/features/moderation/screens/moderator_guard_screen.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_course.dart';
 import 'package:peer_learn_hub/features/learning/screens/learning_screens.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_quiz.dart';
@@ -14,6 +14,7 @@ import 'package:peer_learn_hub/models/lesson.dart';
 import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
+import 'package:peer_learn_hub/screens/moderator_register_screen.dart';
 import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
 import 'package:peer_learn_hub/screens/profile_screen.dart';
 import 'package:peer_learn_hub/screens/register_screen.dart';
@@ -39,6 +40,10 @@ class RouterClass {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/moderation/register',
+        builder: (context, state) => const ModeratorRegisterScreen(),
       ),
       GoRoute(
         path: '/forgot-password',
@@ -126,7 +131,7 @@ class RouterClass {
       ),
       GoRoute(
         path: '/moderation',
-        builder: (context, state) => const ModeratorDashboardScreen(),
+        builder: (context, state) => const ModeratorGuardScreen(),
       ),
     ],
   );

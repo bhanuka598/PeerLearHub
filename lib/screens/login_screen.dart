@@ -63,7 +63,30 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      AppAuth.instance.setRole(AppUserRole.student);
+      
+      // Fetch user role from backend
+      try {
+        final loginData = await AuthService.instance.loginWithRole();
+        final roleString = loginData['user']['role'] as String?;
+        
+        switch (roleString) {
+          case 'moderator':
+            AppAuth.instance.setRole(AppUserRole.moderator);
+            break;
+          case 'teacher':
+            AppAuth.instance.setRole(AppUserRole.teacher);
+            break;
+          case 'admin':
+            AppAuth.instance.setRole(AppUserRole.admin);
+            break;
+          default:
+            AppAuth.instance.setRole(AppUserRole.student);
+        }
+      } catch (e) {
+        // Fallback to student role if backend fails
+        AppAuth.instance.setRole(AppUserRole.student);
+      }
+      
       context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {
@@ -129,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => context.canPop() ? context.pop() : null,
                   icon: const Icon(Icons.arrow_back_ios_new_rounded),
                   style: IconButton.styleFrom(
                     backgroundColor: AppTheme.iconBackground,
@@ -291,6 +314,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.go('/moderation/register'),
+                    child: Text(
+                      'Register as Moderator',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),

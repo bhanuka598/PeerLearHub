@@ -16,6 +16,44 @@ const app = express();
 const port = Number(process.env.PORT || 4000);
 const otpStore = new Map();
 
+// Generate secure admin key if not provided (DEVELOPMENT ONLY)
+function generateSecureAdminKey() {
+  const length = 32;
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let result = '';
+  const values = new Uint32Array(length);
+  crypto.randomFillSync(values);
+  for (let i = 0; i < length; i++) {
+    result += charset[values[i] % charset.length];
+  }
+  return result;
+}
+
+// Set admin key from environment variable (PRODUCTION) or generate one (DEVELOPMENT)
+const isProduction = process.env.NODE_ENV === 'production';
+const ADMIN_KEY = process.env.MODERATOR_ADMIN_KEY;
+
+// In production, admin key MUST be set via environment variable
+if (isProduction && !ADMIN_KEY) {
+  console.error('❌ CRITICAL: MODERATOR_ADMIN_KEY environment variable is required in production!');
+  console.error('❌ Please set it before starting the server:');
+  console.error('   export MODERATOR_ADMIN_KEY=your-secure-key');
+  console.error('   Or generate one using: npm run generate-admin-key');
+  process.exit(1);
+}
+
+// In development, generate key if not provided
+let generatedKey = null;
+if (!isProduction && !ADMIN_KEY) {
+  generatedKey = generateSecureAdminKey();
+  console.log('🔑 Generated Admin Key for Moderator Registration (Development Mode):');
+  console.log('   ' + generatedKey);
+  console.log('⚠️  This is for development only. In production, set MODERATOR_ADMIN_KEY environment variable.');
+}
+
+// Use the actual admin key (either from env or generated)
+const effectiveAdminKey = ADMIN_KEY || generatedKey;
+
 // Configure CORS to allow requests from Flutter web
 app.use(cors({
   origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'],
@@ -79,6 +117,22 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Get admin key (development only - remove in production)
+app.get('/api/admin/key', (_req, res) => {
+  if (isProduction) {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin key retrieval is disabled in production.',
+    });
+  }
+  
+  res.json({
+    success: true,
+    adminKey: effectiveAdminKey,
+    note: 'This endpoint is for development only. Remove in production.',
+  });
+});
+
 app.post('/api/auth/verify-token', async (req, res) => {
   try {
     const { idToken } = req.body ?? {};
@@ -91,7 +145,12 @@ app.post('/api/auth/verify-token', async (req, res) => {
     }
 
     const decodedToken = await getAuth().verifyIdToken(idToken);
-
+    
+    // Fetch user role from Firestore
+    const db = getFirestore();
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    
     return res.json({
       success: true,
       user: {
@@ -100,6 +159,7 @@ app.post('/api/auth/verify-token', async (req, res) => {
         name: decodedToken.name ?? null,
         picture: decodedToken.picture ?? null,
         provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
+        role: userData.role || 'student',
       },
     });
   } catch (error) {
@@ -118,6 +178,168 @@ app.post('/api/auth/verify-token', async (req, res) => {
     });
   }
 });
+
+// Moderator registration endpoint (requires admin key)
+app.post('/api/auth/register-moderator', async (req, res) => {
+  try {
+    const { idToken, adminKey } = req.body ?? {};
+
+    // Verify admin key
+    if (adminKey !== effectiveAdminKey) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid admin key. Access denied.',
+      });
+    }
+
+    if (!idToken || typeof idToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing Firebase ID token.',
+      });
+    }
+
+    // Verify Firebase token
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userId = decodedToken.uid;
+
+    // Update user role in Firestore
+    const db = getFirestore();
+    await db.collection('users').doc(userId).set({
+      role: 'moderator',
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      message: 'User promoted to moderator successfully.',
+      user: {
+        uid: userId,
+        email: decodedToken.email,
+        role: 'moderator',
+      },
+    });
+  } catch (error) {
+    console.error('Moderator registration failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to register moderator.',
+    });
+  }
+});
+
+// Role-based login endpoint
+app.post('/api/auth/login-with-role', async (req, res) => {
+  try {
+    const { idToken } = req.body ?? {};
+
+    if (!idToken || typeof idToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing Firebase ID token.',
+      });
+    }
+
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    
+    // Fetch user role from Firestore
+    const db = getFirestore();
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found in database.',
+      });
+    }
+
+    const userData = userDoc.data();
+    const userRole = userData.role || 'student';
+
+    return res.json({
+      success: true,
+      user: {
+        uid: decodedToken.uid,
+        email: decodedToken.email ?? null,
+        name: decodedToken.name ?? null,
+        picture: decodedToken.picture ?? null,
+        provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
+        role: userRole,
+      },
+      redirectRoute: getRedirectRoute(userRole),
+    });
+  } catch (error) {
+    console.error('Role-based login failed:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired Firebase token.',
+    });
+  }
+});
+
+// Helper function to get redirect route based on role
+function getRedirectRoute(role) {
+  switch (role) {
+    case 'moderator':
+      return '/moderation';
+    case 'teacher':
+      return '/skill-provider';
+    case 'student':
+    default:
+      return '/learning';
+  }
+}
+
+// Middleware to check if user has required role
+function requireRole(...allowedRoles) {
+  return async (req, res, next) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authorization header required.',
+        });
+      }
+
+      const idToken = authHeader.substring(7);
+      const decodedToken = await getAuth().verifyIdToken(idToken);
+      
+      const db = getFirestore();
+      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.',
+        });
+      }
+
+      const userData = userDoc.data();
+      const userRole = userData.role || 'student';
+
+      if (!allowedRoles.includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. Required role: ${allowedRoles.join(' or ')}`,
+        });
+      }
+
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        role: userRole,
+      };
+      next();
+    } catch (error) {
+      console.error('Role verification failed:', error);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authorization token.',
+      });
+    }
+  };
+}
 
 function hashOtp(otp) {
   return crypto.createHash('sha256').update(otp).digest('hex');
@@ -202,6 +424,65 @@ app.post('/api/auth/password-reset/verify', async (req, res) => {
   }
 });
 
+// Example protected route for moderators only
+app.get('/api/moderation/dashboard-stats', requireRole('moderator', 'admin'), async (req, res) => {
+  try {
+    const db = getFirestore();
+    
+    // Get verification requests stats
+    const verificationSnapshot = await db.collection('verificationRequests')
+      .where('status', '==', 'pending')
+      .get();
+    
+    // Get reports stats
+    const reportsSnapshot = await db.collection('reports')
+      .where('status', '==', 'open')
+      .get();
+    
+    return res.json({
+      success: true,
+      stats: {
+        pendingVerifications: verificationSnapshot.size,
+        openReports: reportsSnapshot.size,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to fetch dashboard stats:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard statistics.',
+    });
+  }
+});
+
+// Example protected route for teachers and moderators
+app.get('/api/lessons/my-lessons', requireRole('teacher', 'moderator', 'admin'), async (req, res) => {
+  try {
+    const db = getFirestore();
+    const { uid } = req.user;
+    
+    const lessonsSnapshot = await db.collection('lessons')
+      .where('authorId', '==', uid)
+      .get();
+    
+    const lessons = lessonsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    
+    return res.json({
+      success: true,
+      lessons,
+    });
+  } catch (error) {
+    console.error('Failed to fetch lessons:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch lessons.',
+    });
+  }
+});
+
 // Assignment submission endpoint
 app.post('/api/assignments/submit', async (req, res) => {
   try {
@@ -262,4 +543,11 @@ app.use((req, res) => {
 
 app.listen(port, () => {
   console.log(`PeerLearnHub backend listening on http://localhost:${port}`);
+  console.log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  
+  if (isProduction) {
+    console.log('✅ Security: Admin key loaded from environment variable');
+  } else {
+    console.log('⚠️  Development Mode: Using generated admin key');
+  }
 });

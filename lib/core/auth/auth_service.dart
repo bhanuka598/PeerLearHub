@@ -275,4 +275,89 @@ class AuthService {
       return false;
     }
   }
+
+  Future<bool> isModerator() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (!userDoc.exists) {
+        return false;
+      }
+
+      final userData = userDoc.data();
+      if (userData == null) {
+        return false;
+      }
+
+      return userData['role'] == 'moderator';
+    } catch (e) {
+      debugPrint('Error checking moderator status: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> registerAsModerator({
+    required String adminKey,
+  }) async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in to register as moderator.');
+    }
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/register-moderator'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'adminKey': adminKey,
+      }),
+    );
+
+    final payload = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Failed to register as moderator.');
+    }
+
+    return Map<String, dynamic>.from(payload['user'] as Map);
+  }
+
+  Future<Map<String, dynamic>> loginWithRole() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in.');
+    }
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/login-with-role'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+
+    final payload = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Login failed.');
+    }
+
+    return Map<String, dynamic>.from(payload as Map);
+  }
 }
