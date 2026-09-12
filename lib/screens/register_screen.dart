@@ -127,29 +127,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
       
-      // Fetch user role from backend
+      // Fetch user role from backend and respect the API redirect for moderators.
       try {
         final loginData = await AuthService.instance.loginWithRole();
         final roleString = loginData['user']['role'] as String?;
-        
-        switch (roleString) {
-          case 'moderator':
-            AppAuth.instance.setRole(AppUserRole.moderator);
-            break;
-          case 'teacher':
-            AppAuth.instance.setRole(AppUserRole.teacher);
-            break;
-          case 'admin':
-            AppAuth.instance.setRole(AppUserRole.admin);
-            break;
-          default:
-            AppAuth.instance.setRole(AppUserRole.student);
-        }
+        final redirectRoute = (loginData['redirectRoute'] as String?) ??
+            AppAuth.instance.getHomeRouteForRole(roleString);
+
+        AppAuth.instance.setRoleFromApi(roleString);
+        context.go(redirectRoute);
+        return;
       } catch (e) {
-        // Fallback to student role if backend fails
-        AppAuth.instance.setRole(AppUserRole.student);
+        final fallbackRole = await AuthService.instance.getCurrentUserRole();
+        AppAuth.instance.setRoleFromApi(fallbackRole);
       }
-      
+
       context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {
