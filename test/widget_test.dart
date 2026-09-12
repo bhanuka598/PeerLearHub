@@ -2,11 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/main.dart';
+import 'package:peer_learn_hub/screens/splash_screen.dart';
 
 void main() {
   testWidgets('PeerLearnHub splash then shows the welcome screen', (
     WidgetTester tester,
   ) async {
+    SplashScreen.hasCompleted = false;
     await tester.pumpWidget(const PeerLearnHub());
     await tester.pump();
 

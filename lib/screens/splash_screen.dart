@@ -8,6 +8,8 @@ import '../core/widgets/app_logo.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
+  static bool hasCompleted = false;
+
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -57,6 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
+    SplashScreen.hasCompleted = true;
     final destination = AppAuth.instance.currentRole != null
         ? AppAuth.instance.getHomeRoute()
         : '/welcome';

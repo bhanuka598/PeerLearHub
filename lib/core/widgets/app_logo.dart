@@ -40,6 +40,16 @@ class AppLogo extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) {
+          return ColoredBox(
+            color: const Color(0xFF00B4A6),
+            child: Icon(
+              Icons.groups_rounded,
+              color: Colors.white,
+              size: size * 0.52,
+            ),
+          );
+        },
       ),
     );
   }
