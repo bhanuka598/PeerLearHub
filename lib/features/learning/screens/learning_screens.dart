@@ -826,8 +826,15 @@ class _LearningNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return NavigationBar(
       selectedIndex: index,
-      onDestinationSelected: (value) =>
-          context.go(value == 0 ? '/learning' : '/learning/my-courses'),
+      onDestinationSelected: (value) {
+        if (value == 0) {
+          context.go('/learning');
+        } else if (value == 1) {
+          context.go('/learning/my-courses');
+        } else if (value == 2) {
+          context.go('/skill-exchange');
+        }
+      },
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.explore_outlined),
@@ -838,6 +845,11 @@ class _LearningNav extends StatelessWidget {
           icon: Icon(Icons.play_lesson_outlined),
           selectedIcon: Icon(Icons.play_lesson),
           label: 'My Learning',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.swap_horiz_outlined),
+          selectedIcon: Icon(Icons.swap_horiz),
+          label: 'Skill Exchange',
         ),
       ],
     );
