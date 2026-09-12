@@ -119,9 +119,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy · hh:mm a');
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5F7FB),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -132,7 +132,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           style: TextStyle(
             color: Colors.black87,
             fontSize: 20,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -145,127 +145,105 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Status & Severity Card
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _getSeverityColor().withOpacity(0.2),
-                            width: 2,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F766E), Color(0xFF2DD4BF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
+                          borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: AppColors.primaryTeal.withOpacity(0.2),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                        child: Column(
+                        child: Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.white.withOpacity(0.18),
+                              backgroundImage: const AssetImage(
+                                'assets/images/profile_hero.png',
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _report!.reason.displayName,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
                                     children: [
-                                      Text(
-                                        'Status',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey[600],
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
+                                          horizontal: 10,
+                                          vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: _getStatusColor().withOpacity(0.1),
+                                          color: Colors.white.withOpacity(0.14),
                                           borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: _getStatusColor(),
-                                            width: 1.5,
-                                          ),
                                         ),
                                         child: Text(
                                           _report!.status.displayName,
-                                          style: TextStyle(
-                                            color: _getStatusColor(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 14,
+                                            fontSize: 11,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 50,
-                                  color: Colors.grey[300],
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Severity',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey[600],
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
+                                          horizontal: 10,
+                                          vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: _getSeverityColor().withOpacity(0.1),
+                                          color: Colors.white.withOpacity(0.14),
                                           borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: _getSeverityColor(),
-                                            width: 1.5,
-                                          ),
                                         ),
                                         child: Text(
                                           _report!.severity.displayName,
-                                          style: TextStyle(
-                                            color: _getSeverityColor(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 14,
+                                            fontSize: 11,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 16),
 
-                      // Report Info Card
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
@@ -273,7 +251,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Report Information',
+                              'Report information',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -305,17 +283,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Users Involved Card
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
@@ -323,7 +300,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Users Involved',
+                              'Users involved',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -333,7 +310,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                             const SizedBox(height: 16),
                             _buildInfoRow(
                               Icons.person_off_outlined,
-                              'Reported User',
+                              'Reported user',
                               _report!.reportedUserName ?? 'Unknown',
                             ),
                             const SizedBox(height: 12),
@@ -347,17 +324,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Description Card
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
@@ -385,14 +361,13 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         ),
                       ),
 
-                      // Resolution Note (if exists)
                       if (_report!.resolutionNote != null) ...[
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.green[200]!),
                           ),
                           child: Column(
@@ -407,7 +382,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Resolution Note',
+                                    'Resolution note',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
@@ -431,7 +406,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
                       const SizedBox(height: 24),
 
-                      // Action Buttons
                       if (_report!.status != ReportStatus.resolved &&
                           _report!.status != ReportStatus.dismissed &&
                           !_isProcessing) ...[
@@ -446,7 +420,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
                               child: const Text(
@@ -469,7 +443,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                   side: BorderSide(color: Colors.grey[400]!, width: 2),
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                                 child: const Text(
@@ -491,7 +465,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                                 child: const Text(

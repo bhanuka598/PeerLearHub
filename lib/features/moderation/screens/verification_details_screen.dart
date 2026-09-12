@@ -155,9 +155,9 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5F7FB),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -168,7 +168,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
           style: TextStyle(
             color: Colors.black87,
             fontSize: 20,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -181,35 +181,33 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // User Card
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: AppColors.primaryTeal.withOpacity(0.2),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
                         child: Row(
                           children: [
                             CircleAvatar(
-                              radius: 36,
-                              backgroundColor: AppColors.primaryLight,
-                              child: Text(
-                                _request!.userName[0].toUpperCase(),
-                                style: const TextStyle(
-                                  color: AppColors.primaryTeal,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              radius: 32,
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              backgroundImage: const AssetImage(
+                                'assets/images/profile_hero.png',
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,25 +217,25 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
-                                      color: Colors.black87,
+                                      color: Colors.white,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: _getStatusColor().withOpacity(0.1),
+                                      color: Colors.white.withOpacity(0.14),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       _request!.status.displayName,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: _getStatusColor(),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ),
@@ -249,17 +247,16 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Verification Info Card
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
@@ -267,7 +264,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Verification Details',
+                              'Verification details',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -298,7 +295,6 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                         ),
                       ),
 
-                      // Experience/Description (for skill verification)
                       if (_request!.verificationType == VerificationType.skill &&
                           _request!.experienceDescription != null) ...[
                         const SizedBox(height: 16),
@@ -306,12 +302,12 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
@@ -340,7 +336,6 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                         ),
                       ],
 
-                      // Portfolio/Evidence
                       if (_request!.portfolioUrl != null ||
                           (_request!.evidenceUrls != null &&
                               _request!.evidenceUrls!.isNotEmpty)) ...[
@@ -349,12 +344,12 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
@@ -392,7 +387,6 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                         ),
                       ],
 
-                      // Rejection Reason (if rejected)
                       if (_request!.status == VerificationStatus.rejected &&
                           _request!.rejectionReason != null) ...[
                         const SizedBox(height: 16),
@@ -400,7 +394,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.red[200]!),
                           ),
                           child: Row(
@@ -417,7 +411,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Rejection Reason',
+                                      'Rejection reason',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
@@ -442,7 +436,6 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
 
                       const SizedBox(height: 24),
 
-                      // Action Buttons
                       if (_request!.status == VerificationStatus.pending &&
                           !_isProcessing)
                         Row(
@@ -455,7 +448,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                   side: const BorderSide(color: Colors.red, width: 2),
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                                 child: const Text(
@@ -477,7 +470,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                                 child: const Text(
