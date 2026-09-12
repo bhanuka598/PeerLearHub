@@ -66,6 +66,7 @@ class AuthService {
     required String email,
     required String password,
     required String learningGoal,
+    String role = 'student',
   }) async {
     _lastError = null;
     final credential = await _requiredFirebaseAuth
@@ -85,7 +86,7 @@ class AuthService {
         'fullName': fullName.trim(),
         'email': user.email,
         'learningGoal': learningGoal,
-        'role': 'student',
+        'role': role,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -325,9 +326,7 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> registerAsModerator({
-    required String adminKey,
-  }) async {
+  Future<Map<String, dynamic>> registerAsModerator() async {
     final user = _firebaseAuth?.currentUser;
     if (user == null) {
       throw Exception('User must be logged in to register as moderator.');
@@ -343,7 +342,6 @@ class AuthService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'idToken': idToken,
-        'adminKey': adminKey,
       }),
     );
 

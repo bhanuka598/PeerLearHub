@@ -1,10 +1,13 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../utils/provider_id_helper.dart';
 import '../../../models/lesson.dart';
-import '../../../services/lesson_service.dart';
+import '../services/firebase_lesson_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/empty_lessons_state.dart';
 import '../widgets/lesson_list_card.dart';
@@ -17,13 +20,14 @@ class MyLessonsScreen extends StatefulWidget {
 }
 
 class _MyLessonsScreenState extends State<MyLessonsScreen> {
-  final _lessonService = DemoLessonService.instance;
+  final _lessonService = FirebaseLessonService.instance;
   final _searchController = TextEditingController();
 
   List<Lesson> _lessons = [];
   bool _isLoading = true;
   String _selectedFilter = 'All';
   String _searchQuery = '';
+  StreamSubscription<User?>? _authSub;
 
   static const _filters = ['All', 'Active', 'Draft', 'Inactive'];
 
@@ -31,6 +35,9 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
   void initState() {
     super.initState();
     _lessonService.addListener(_loadLessons);
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((_) {
+      _loadLessons();
+    });
     _loadLessons();
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
@@ -40,19 +47,26 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
   @override
   void dispose() {
     _lessonService.removeListener(_loadLessons);
+    _authSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _loadLessons() async {
-    final lessons = await _lessonService.getLessonsByProvider(
-      AppConstants.demoProviderId,
-    );
-    if (mounted) {
-      setState(() {
-        _lessons = lessons;
-        _isLoading = false;
-      });
+    try {
+      final lessons = await _lessonService.getLessonsByProvider(
+        await resolveProviderId(),
+      );
+      if (mounted) {
+        setState(() {
+          _lessons = lessons;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -98,11 +112,24 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await _lessonService.deleteLesson(lesson.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${lesson.title}" has been deleted.')),
-        );
+      try {
+        await _lessonService.deleteLesson(lesson.id);
+        if (mounted) {
+          setState(() {
+            _lessons.removeWhere((item) => item.id == lesson.id);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('"${lesson.title}" has been deleted.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not delete lesson from Firebase.'),
+            ),
+          );
+        }
       }
     }
   }

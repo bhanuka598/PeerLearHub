@@ -173,8 +173,6 @@ const _courses = [
     rating: 4.8,
     colorValue: 0xFF00695C,
     modules: _modules,
-    enrolled: true,
-    progress: 75,
   ),
   LearningCourse(
     id: 'mern',
@@ -188,8 +186,6 @@ const _courses = [
     rating: 4.7,
     colorValue: 0xFF1565C0,
     modules: _modules,
-    enrolled: true,
-    progress: 12,
   ),
   LearningCourse(
     id: 'ux',
