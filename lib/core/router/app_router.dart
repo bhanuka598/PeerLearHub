@@ -27,6 +27,7 @@ import 'package:peer_learn_hub/models/lesson.dart';
 import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
+import 'package:peer_learn_hub/screens/splash_screen.dart';
 import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
 import 'package:peer_learn_hub/screens/register_screen.dart';
 
@@ -42,9 +43,13 @@ class RouterClass {
       return null;
     },
     routes: [
-      GoRoute(path: '/', builder: (context, state) => const LoadingScreen()),
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: '/loading',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/welcome',
         builder: (context, state) => const LoadingScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),

@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
+import '../../../core/utils/lesson_image.dart';
 import '../../../models/lesson.dart';
 import '../../skill_provider/models/review.dart';
 import '../../skill_provider/services/firebase_lesson_service.dart';
@@ -421,44 +420,15 @@ class _StudentLessonDetailsScreenState
   }
 
   Widget _buildThumbnail() {
-    final url = lesson.imageUrl?.trim();
-    final hasImage = url != null &&
-        url.isNotEmpty &&
-        !url.contains('placeholder.peerlearnhub.com');
+    final image = lessonImageProvider(lesson.imageUrl);
+    if (image == null) return _thumbnailPlaceholder();
 
-    if (hasImage && url.startsWith('data:image/')) {
-      final data = Uri.tryParse(url)?.data;
-      if (data != null) {
-        return Image.memory(
-          data.contentAsBytes(),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
-        );
-      }
-    }
-
-    if (hasImage && url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
-      );
-    }
-
-    if (hasImage && !url.startsWith('http') && !url.startsWith('data:')) {
-      try {
-        return Image.memory(
-          base64Decode(url),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
-        );
-      } catch (_) {}
-    }
-
-    return _thumbnailPlaceholder();
+    return Image(
+      image: image,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
+    );
   }
 
   Widget _thumbnailPlaceholder() {

@@ -57,7 +57,7 @@ class FirebaseLessonService extends ChangeNotifier {
 
       for (final lesson in _lessons) {
         if (lesson.providerId == providerId || lesson.providerId == uid) {
-          lessonsById[lesson.id] = lesson;
+          _upsertLesson(lessonsById, lesson);
         }
       }
 
@@ -108,14 +108,31 @@ class FirebaseLessonService extends ChangeNotifier {
     }
 
     if (fetched == null) return cached;
-    final fetchedImage = fetched.imageUrl;
-    final cachedImage = cached?.imageUrl;
-    if ((fetchedImage == null || fetchedImage.isEmpty) &&
-        cachedImage != null &&
-        cachedImage.isNotEmpty) {
-      return fetched.copyWith(imageUrl: cachedImage);
+    return _preferImage(fetched, cached);
+  }
+
+  Lesson _preferImage(Lesson primary, Lesson? secondary) {
+    if (secondary == null) return primary;
+    final primaryImage = primary.imageUrl;
+    final secondaryImage = secondary.imageUrl;
+    if ((primaryImage == null || primaryImage.isEmpty) &&
+        secondaryImage != null &&
+        secondaryImage.isNotEmpty) {
+      return primary.copyWith(imageUrl: secondaryImage);
     }
-    return fetched;
+    return primary;
+  }
+
+  void _upsertLesson(Map<String, Lesson> lessonsById, Lesson lesson) {
+    final existing = lessonsById[lesson.id];
+    if (existing == null) {
+      lessonsById[lesson.id] = lesson;
+      return;
+    }
+    final newer =
+        lesson.updatedAt.isAfter(existing.updatedAt) ? lesson : existing;
+    final older = identical(newer, lesson) ? existing : lesson;
+    lessonsById[lesson.id] = _preferImage(newer, older);
   }
 
   Future<Lesson> createLesson(Lesson lesson) async {
@@ -245,9 +262,9 @@ class FirebaseLessonService extends ChangeNotifier {
       if (stored is Map) {
         stored.forEach((key, value) {
           if (value is Map) {
-            lessonsById.putIfAbsent(
-              key.toString(),
-              () => Lesson.fromDocData(
+            _upsertLesson(
+              lessonsById,
+              Lesson.fromDocData(
                 key.toString(),
                 Map<String, dynamic>.from(value),
               ),
@@ -259,9 +276,9 @@ class FirebaseLessonService extends ChangeNotifier {
       data.forEach((key, value) {
         if (key.startsWith('skillProviderLessons.') && value is Map) {
           final id = key.substring('skillProviderLessons.'.length);
-          lessonsById.putIfAbsent(
-            id,
-            () => Lesson.fromDocData(id, Map<String, dynamic>.from(value)),
+          _upsertLesson(
+            lessonsById,
+            Lesson.fromDocData(id, Map<String, dynamic>.from(value)),
           );
         }
       });
@@ -414,7 +431,7 @@ class FirebaseLessonService extends ChangeNotifier {
           .where('status', isEqualTo: LessonStatus.active.name)
           .get();
       for (final doc in snapshot.docs) {
-        lessonsById[doc.id] = Lesson.fromFirestore(doc);
+        _upsertLesson(lessonsById, Lesson.fromFirestore(doc));
       }
     } catch (e) {
       debugPrint('Published lessons query skipped: $e');
@@ -427,7 +444,7 @@ class FirebaseLessonService extends ChangeNotifier {
 
     for (final lesson in _lessons) {
       if (lesson.status == LessonStatus.active) {
-        lessonsById[lesson.id] = lesson;
+        _upsertLesson(lessonsById, lesson);
       }
     }
 

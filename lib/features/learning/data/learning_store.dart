@@ -24,8 +24,8 @@ const _modules = [
 ];
 
 const _courses = [
-  LearningCourse(id: 'flutter', title: 'Flutter & Dart Masterclass', description: 'Build polished, responsive mobile apps with Flutter and Dart from first widget to production-ready interface.', category: 'Mobile', level: 'Intermediate', instructor: 'Angela Yu', duration: '18h 30m', rating: 4.8, colorValue: 0xFF00695C, modules: _modules, enrolled: true, progress: 75),
-  LearningCourse(id: 'mern', title: 'MERN Stack Essentials', description: 'Learn to build full-stack web applications using MongoDB, Express, React, and Node.js.', category: 'Web', level: 'Beginner', instructor: 'Colt Steele', duration: '14h 10m', rating: 4.7, colorValue: 0xFF1565C0, modules: _modules, enrolled: true, progress: 12),
+  LearningCourse(id: 'flutter', title: 'Flutter & Dart Masterclass', description: 'Build polished, responsive mobile apps with Flutter and Dart from first widget to production-ready interface.', category: 'Mobile', level: 'Intermediate', instructor: 'Angela Yu', duration: '18h 30m', rating: 4.8, colorValue: 0xFF00695C, modules: _modules),
+  LearningCourse(id: 'mern', title: 'MERN Stack Essentials', description: 'Learn to build full-stack web applications using MongoDB, Express, React, and Node.js.', category: 'Web', level: 'Beginner', instructor: 'Colt Steele', duration: '14h 10m', rating: 4.7, colorValue: 0xFF1565C0, modules: _modules),
   LearningCourse(id: 'ux', title: 'UI/UX Design Foundations', description: 'Create user-centred digital experiences with practical design systems and prototypes.', category: 'UI/UX', level: 'Beginner', instructor: 'Maya Patel', duration: '9h 20m', rating: 4.9, colorValue: 0xFF7B1FA2, modules: _modules),
   LearningCourse(id: 'ai', title: 'Applied AI for Developers', description: 'Explore practical AI concepts, prompts, and integrations for modern applications.', category: 'AI', level: 'Advanced', instructor: 'James Wilson', duration: '11h 45m', rating: 4.6, colorValue: 0xFFEF6C00, modules: _modules),
 ];

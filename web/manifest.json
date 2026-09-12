@@ -1,11 +1,11 @@
 {
-    "name": "peer_learn_hub",
-    "short_name": "peer_learn_hub",
+    "name": "PeerLearnHub",
+    "short_name": "PeerLearnHub",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#00B4A6",
+    "theme_color": "#008F83",
+    "description": "PeerLearnHub — learn, share, and grow together.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

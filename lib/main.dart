@@ -27,7 +27,7 @@ class PeerLearnHub extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'Peer Learn Hub',
+      title: 'PeerLearnHub',
       theme: AppTheme.lightTheme,
       routerConfig: RouterClass.router,
     );

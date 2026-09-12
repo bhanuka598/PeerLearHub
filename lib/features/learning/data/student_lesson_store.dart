@@ -43,6 +43,12 @@ class StudentLessonStore extends ChangeNotifier {
     await _persist();
   }
 
+  Future<void> unenroll(String lessonId) async {
+    if (!_enrolledIds.remove(lessonId)) return;
+    notifyListeners();
+    await _persist();
+  }
+
   Future<void> _persist() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;

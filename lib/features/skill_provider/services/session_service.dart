@@ -45,8 +45,7 @@ class SessionService extends ChangeNotifier {
   Future<List<ProviderSession>> getSessionsByLearner(String learnerId) async {
     if (useMockData) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      // Mock identity: signed-in testers still see demo learner sessions.
-      return List<ProviderSession>.from(_sessions)
+      return _sessions.where((s) => s.learnerId == learnerId).toList()
         ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     }
     final snapshot = await FirebaseFirestore.instance

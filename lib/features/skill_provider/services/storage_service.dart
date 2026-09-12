@@ -96,23 +96,37 @@ class StorageService {
     String fileName,
   ) async {
     try {
-      if (bytes.lengthInBytes <= 350 * 1024) {
+      const maxBytes = 280 * 1024;
+      if (bytes.lengthInBytes <= maxBytes) {
         return 'data:${_contentType(fileName)};base64,${base64Encode(bytes)}';
       }
 
-      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 720);
-      final frame = await codec.getNextFrame();
-      final image = frame.image;
-      final png = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (png == null) return null;
+      Uint8List? smallest;
+      for (final width in [480, 360, 240, 160]) {
+        final compressed = await _resizePng(bytes, width);
+        if (compressed == null) continue;
+        smallest = compressed;
+        if (compressed.lengthInBytes <= maxBytes) {
+          return 'data:image/png;base64,${base64Encode(compressed)}';
+        }
+      }
 
-      final compressed = png.buffer.asUint8List();
-      if (compressed.lengthInBytes > 900 * 1024) return null;
-      return 'data:image/png;base64,${base64Encode(compressed)}';
+      if (smallest != null && smallest.lengthInBytes <= 500 * 1024) {
+        return 'data:image/png;base64,${base64Encode(smallest)}';
+      }
+      return null;
     } catch (e) {
       debugPrint('Thumbnail encode failed: $e');
       return null;
     }
+  }
+
+  Future<Uint8List?> _resizePng(Uint8List bytes, int targetWidth) async {
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: targetWidth);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return png?.buffer.asUint8List();
   }
 }

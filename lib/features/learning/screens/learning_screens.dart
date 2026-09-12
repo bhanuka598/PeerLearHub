@@ -1,14 +1,19 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/app_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
+import '../../../core/utils/lesson_image.dart';
 import '../../../core/widgets/role_switcher_button.dart';
 import '../../notifications/widgets/notification_bell_button.dart';
 import '../../../models/lesson.dart';
+import '../../skill_provider/models/provider_session.dart';
 import '../../skill_provider/services/firebase_lesson_service.dart';
 import '../../skill_provider/services/review_service.dart';
+import '../../skill_provider/services/session_service.dart';
+import '../../skill_provider/utils/display_utils.dart';
 import '../data/learning_store.dart';
 import '../data/student_lesson_store.dart';
 import '../models/learning_course.dart';
@@ -20,18 +25,11 @@ class DiscoverScreen extends StatefulWidget {
 }
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
+  final _searchController = TextEditingController();
   String _category = 'All';
   String _query = '';
   List<Lesson> _teacherLessons = [];
-  static const _categories = [
-    'All',
-    'Mobile',
-    'Web',
-    'AI',
-    'UI/UX',
-    'Backend',
-    'Database',
-  ];
+  bool _loadingLessons = true;
 
   @override
   void initState() {
@@ -45,6 +43,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     FirebaseLessonService.instance.removeListener(_loadTeacherLessons);
     ReviewService.instance.removeListener(_onReviewsChanged);
     super.dispose();
@@ -57,19 +56,49 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Future<void> _loadTeacherLessons() async {
     final lessons = await FirebaseLessonService.instance.getPublishedLessons();
     if (mounted) {
-      setState(() => _teacherLessons = lessons);
+      setState(() {
+        _teacherLessons = lessons;
+        _loadingLessons = false;
+      });
     }
   }
 
-  List<Lesson> get _visibleTeacherLessons {
+  List<String> _categoryOptions(List<LearningCourse> courses) {
+    final values = <String>{
+      ..._teacherLessons.map((lesson) => lesson.category.label),
+      ...courses.map((course) => course.category),
+    };
+    if (values.isEmpty) {
+      values.addAll(LessonCategory.values.map((category) => category.label));
+    }
+    final sorted = values.toList()..sort();
+    return ['All', ...sorted];
+  }
+
+  List<Lesson> _visibleTeacherLessonsFor(String category) {
     final query = _query.toLowerCase();
     return _teacherLessons.where((lesson) {
+      final matchesCategory =
+          category == 'All' || lesson.category.label == category;
       final matchesQuery = query.isEmpty ||
           '${lesson.title} ${lesson.category.label} ${lesson.description}'
               .toLowerCase()
               .contains(query);
-      return matchesQuery;
+      return matchesCategory && matchesQuery;
     }).toList();
+  }
+
+  String get _firstName {
+    final name = FirebaseAuth.instance.currentUser?.displayName?.trim();
+    if (name == null || name.isEmpty) return '';
+    return name.split(' ').first;
+  }
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   @override
@@ -77,129 +106,126 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       ValueListenableBuilder<List<LearningCourse>>(
         valueListenable: LearningStore.instance,
         builder: (context, courses, _) {
-          final visible = courses
+          final categories = _categoryOptions(courses);
+          final selectedCategory =
+              categories.contains(_category) ? _category : 'All';
+          final visibleCourses = courses
               .where(
                 (course) =>
-                    (_category == 'All' || course.category == _category) &&
+                    (selectedCategory == 'All' ||
+                        course.category == selectedCategory) &&
                     ('${course.title} ${course.category} ${course.instructor}'
                         .toLowerCase()
                         .contains(_query.toLowerCase())),
               )
               .toList();
+          final teacherLessons = _visibleTeacherLessonsFor(selectedCategory);
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('PeerLearnHub'),
-              actions: [
-                const NotificationBellButton(onDark: true),
-                const RoleSwitcherButton(onDark: true),
-                IconButton(
-                  onPressed: () {
-                    AppAuth.instance.logout();
-                    context.go('/');
-                  },
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Logout',
-                ),
-              ],
-            ),
-            body: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                children: [
-                  Text(
-                    'Find Your Next Skill',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    onChanged: (value) => setState(() => _query = value),
-                    decoration: const InputDecoration(
-                      hintText: 'Search for courses, skills, topics...',
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Explore Categories',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 42,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        return ChoiceChip(
-                          label: Text(category),
-                          selected: _category == category,
-                          selectedColor: AppTheme.primaryColor.withValues(
-                            alpha: .18,
-                          ),
-                          onSelected: (_) =>
-                              setState(() => _category = category),
-                        );
+            backgroundColor: AppTheme.backgroundColor,
+            body: RefreshIndicator(
+              color: AppTheme.primaryColor,
+              onRefresh: _loadTeacherLessons,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _DiscoverHeader(
+                      greeting: _firstName.isEmpty
+                          ? _greeting
+                          : '$_greeting, $_firstName',
+                      searchController: _searchController,
+                      onQueryChanged: (value) =>
+                          setState(() => _query = value),
+                      onLogout: () {
+                        AppAuth.instance.logout();
+                        context.go('/');
                       },
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Lessons from teachers',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_visibleTeacherLessons.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        'No published lessons yet. Teachers can add one from Create Lesson.',
-                        style: TextStyle(color: AppTheme.textSecondary),
-                      ),
-                    )
-                  else
-                    ..._visibleTeacherLessons.map(
-                      (lesson) => TeacherLessonCard(
-                        lesson: lesson,
-                        onTap: () => context.push(
-                          '/learning/provider-lesson',
-                          extra: lesson,
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _DiscoverSectionHeader(
+                          title: 'Categories',
+                          subtitle: 'Filter by what you want to learn',
                         ),
-                      ),
-                    ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Popular courses',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (visible.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text('No courses match your search.'),
-                      ),
-                    ),
-                  ...visible.map(
-                    (course) => CourseCard(
-                      course: course,
-                      onTap: () =>
-                          context.push('/learning/course', extra: course),
+                        const SizedBox(height: 12),
+                        _DiscoverCategoryBar(
+                          categories: categories,
+                          selected: selectedCategory,
+                          onSelected: (value) =>
+                              setState(() => _category = value),
+                        ),
+                        const SizedBox(height: 24),
+                        _DiscoverSectionHeader(
+                          title: 'Lessons from teachers',
+                          subtitle: teacherLessons.isEmpty
+                              ? 'Live sessions you can join'
+                              : '${teacherLessons.length} available',
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loadingLessons)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 36),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          )
+                        else if (teacherLessons.isEmpty)
+                          _DiscoverEmptyState(
+                            icon: Icons.menu_book_outlined,
+                            title: _query.isNotEmpty || selectedCategory != 'All'
+                                ? 'No lessons match'
+                                : 'No lessons yet',
+                            message: _query.isNotEmpty || selectedCategory != 'All'
+                                ? 'Try another search or category.'
+                                : 'Teachers can publish a lesson from Create Lesson.',
+                          )
+                        else
+                          ...teacherLessons.map(
+                            (lesson) => TeacherLessonCard(
+                              lesson: lesson,
+                              onTap: () => context.push(
+                                '/learning/provider-lesson',
+                                extra: lesson,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 24),
+                        _DiscoverSectionHeader(
+                          title: 'Popular courses',
+                          subtitle: visibleCourses.isEmpty
+                              ? 'Self-paced learning paths'
+                              : '${visibleCourses.length} to explore',
+                        ),
+                        const SizedBox(height: 12),
+                        if (visibleCourses.isEmpty)
+                          const _DiscoverEmptyState(
+                            icon: Icons.school_outlined,
+                            title: 'No courses match',
+                            message:
+                                'Adjust your search or pick another category.',
+                          )
+                        else
+                          ...visibleCourses.map(
+                            (course) => CourseCard(
+                              course: course,
+                              onTap: () => context.push(
+                                '/learning/course',
+                                extra: course,
+                              ),
+                            ),
+                          ),
+                      ]),
                     ),
                   ),
                 ],
               ),
             ),
-            bottomNavigationBar: _LearningNav(index: 0),
+            bottomNavigationBar: const _LearningNav(index: 0),
           );
         },
       );
@@ -270,13 +296,15 @@ class MyLearningScreen extends StatefulWidget {
 
 class _MyLearningScreenState extends State<MyLearningScreen> {
   List<Lesson> _published = [];
+  List<ProviderSession> _sessions = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     FirebaseLessonService.instance.addListener(_load);
     StudentLessonStore.instance.addListener(_onStoreChanged);
-    StudentLessonStore.instance.load();
+    SessionService.instance.addListener(_load);
     _load();
   }
 
@@ -284,6 +312,7 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
   void dispose() {
     FirebaseLessonService.instance.removeListener(_load);
     StudentLessonStore.instance.removeListener(_onStoreChanged);
+    SessionService.instance.removeListener(_load);
     super.dispose();
   }
 
@@ -291,9 +320,47 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
     if (mounted) setState(() {});
   }
 
+  String get _learnerId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  String get _firstName {
+    final name = FirebaseAuth.instance.currentUser?.displayName?.trim();
+    if (name == null || name.isEmpty) return '';
+    return name.split(' ').first;
+  }
+
   Future<void> _load() async {
     final lessons = await FirebaseLessonService.instance.getPublishedLessons();
-    if (mounted) setState(() => _published = lessons);
+    await StudentLessonStore.instance.load();
+    final learnerId = _learnerId;
+    final sessions = learnerId.isEmpty
+        ? <ProviderSession>[]
+        : await SessionService.instance.getSessionsByLearner(learnerId);
+    if (!mounted) return;
+    setState(() {
+      _published = lessons;
+      _sessions = sessions;
+      _loading = false;
+    });
+  }
+
+  ProviderSession? _nextSessionFor(String lessonId) {
+    final upcoming = _sessions
+        .where(
+          (session) =>
+              session.lessonId == lessonId &&
+              session.status == SessionStatus.upcoming,
+        )
+        .toList()
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    return upcoming.isEmpty ? null : upcoming.first;
+  }
+
+  Future<void> _removeLesson(Lesson lesson) async {
+    await StudentLessonStore.instance.unenroll(lesson.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${lesson.title} removed from My Learning.')),
+    );
   }
 
   @override
@@ -301,69 +368,111 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
     return ValueListenableBuilder<List<LearningCourse>>(
       valueListenable: LearningStore.instance,
       builder: (context, courses, _) {
-        final enrolled = courses.where((course) => course.enrolled).toList();
+        final enrolledCourses =
+            courses.where((course) => course.enrolled).toList();
         final teacherLessons =
             StudentLessonStore.instance.enrolledFrom(_published);
+        final upcomingSessions = _sessions
+            .where((session) => session.status == SessionStatus.upcoming)
+            .toList()
+          ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+        final isEmpty = teacherLessons.isEmpty && enrolledCourses.isEmpty;
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('My Courses'),
-            actions: const [
-              NotificationBellButton(),
-              RoleSwitcherButton(),
-            ],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.event_available_outlined,
-                  color: AppTheme.primaryColor,
-                ),
-                title: const Text('My Sessions'),
-                subtitle: const Text('Upcoming classes, reminders, and feedback'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/learning/sessions'),
-              ),
-              const SizedBox(height: 12),
-              if (teacherLessons.isEmpty && enrolled.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Center(
-                    child: Text('Add a lesson or enroll in a course to start learning.'),
+          backgroundColor: AppTheme.backgroundColor,
+          body: RefreshIndicator(
+            color: AppTheme.primaryColor,
+            onRefresh: _load,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _MyLearningHeader(
+                    greeting: _firstName.isEmpty
+                        ? 'Keep learning'
+                        : 'Keep going, $_firstName',
+                    onLogout: () {
+                      AppAuth.instance.logout();
+                      context.go('/');
+                    },
                   ),
                 ),
-              if (teacherLessons.isNotEmpty) ...[
-                Text(
-                  'My lessons',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _SessionsShortcutCard(
+                        upcomingCount: upcomingSessions.length,
+                        nextSession: upcomingSessions.isEmpty
+                            ? null
+                            : upcomingSessions.first,
+                        onTap: () => context.push('/learning/sessions'),
                       ),
-                ),
-                const SizedBox(height: 12),
-                ...teacherLessons.map(
-                  (lesson) => TeacherLessonCard(
-                    lesson: lesson,
-                    onTap: () => context.push(
-                      '/learning/provider-lesson',
-                      extra: lesson,
-                    ),
+                      const SizedBox(height: 20),
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        )
+                      else if (isEmpty)
+                        _MyLearningEmptyState(
+                          onBrowse: () => context.go('/learning'),
+                        )
+                      else ...[
+                        if (teacherLessons.isNotEmpty) ...[
+                          _DiscoverSectionHeader(
+                            title: 'My lessons',
+                            subtitle: teacherLessons.length == 1
+                                ? '1 lesson you added'
+                                : '${teacherLessons.length} lessons you added',
+                          ),
+                          const SizedBox(height: 12),
+                          ...teacherLessons.map(
+                            (lesson) => _EnrolledLessonCard(
+                              lesson: lesson,
+                              nextSession: _nextSessionFor(lesson.id),
+                              onOpen: () => context.push(
+                                '/learning/provider-lesson',
+                                extra: lesson,
+                              ),
+                              onRemove: () => _removeLesson(lesson),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (enrolledCourses.isNotEmpty) ...[
+                          _DiscoverSectionHeader(
+                            title: 'My courses',
+                            subtitle: enrolledCourses.length == 1
+                                ? '1 course in progress'
+                                : '${enrolledCourses.length} courses in progress',
+                          ),
+                          const SizedBox(height: 12),
+                          ...enrolledCourses.map(
+                            (course) => LearningCourseCard(
+                              course: course,
+                              onContinue: () => context.push(
+                                '/learning/lesson',
+                                extra: course,
+                              ),
+                              onTap: () => context.push(
+                                '/learning/course',
+                                extra: course,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ]),
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
-              ...enrolled.map(
-                (course) => LearningCourseCard(
-                  course: course,
-                  onContinue: () =>
-                      context.push('/learning/lesson', extra: course),
-                  onTap: () => context.push('/learning/course', extra: course),
-                ),
-              ),
-            ],
+            ),
           ),
-          bottomNavigationBar: _LearningNav(index: 1),
+          bottomNavigationBar: const _LearningNav(index: 1),
         );
       },
     );
@@ -504,98 +613,77 @@ class TeacherLessonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rating = ReviewService.instance.averageForLesson(lesson.id);
-    return Card(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: AppTheme.cardDecoration,
       clipBehavior: Clip.antiAlias,
-      margin: const EdgeInsets.only(bottom: 14),
-      child: InkWell(
-        onTap: onTap,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 106,
-              height: 132,
-              child: _thumb(),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      lesson.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${lesson.category.label} • ${lesson.skillLevel.label}',
-                      style: const TextStyle(color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: Colors.amber,
-                          size: 18,
-                        ),
-                        Text(rating == 0 ? ' New' : ' ${rating.toStringAsFixed(1)}'),
-                        const Spacer(),
-                        Text(
-                          lesson.duration,
-                          style: const TextStyle(color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      formatLessonPrice(lesson),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CatalogThumb(
+                  image: lessonImageProvider(lesson.imageUrl),
+                  icon: _categoryIcon(lesson.category.label),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              lesson.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                height: 1.25,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _PriceBadge(
+                            label: formatLessonPrice(lesson),
+                            emphasize: lesson.isFree,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _InfoChip(
+                            icon: _categoryIcon(lesson.category.label),
+                            label: lesson.category.label,
+                          ),
+                          _InfoChip(label: lesson.skillLevel.label),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _CatalogMetaRow(
+                        rating: rating,
+                        duration: lesson.duration,
+                        extra: lesson.lessonType.label,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _thumb() {
-    final url = lesson.imageUrl?.trim();
-    final hasImage = url != null &&
-        url.isNotEmpty &&
-        !url.contains('placeholder.peerlearnhub.com');
-    if (hasImage && url.startsWith('data:image/')) {
-      final data = Uri.tryParse(url)?.data;
-      if (data != null) {
-        return Image.memory(
-          data.contentAsBytes(),
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _thumbPlaceholder(),
-        );
-      }
-    }
-    if (hasImage && url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _thumbPlaceholder(),
-      );
-    }
-    return _thumbPlaceholder();
-  }
-
-  Widget _thumbPlaceholder() {
-    return const ColoredBox(
-      color: AppTheme.iconBackground,
-      child: Icon(Icons.image_outlined, color: AppTheme.primaryColor, size: 36),
     );
   }
 }
@@ -608,69 +696,64 @@ class CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: AppTheme.cardDecoration,
       clipBehavior: Clip.antiAlias,
-      margin: const EdgeInsets.only(bottom: 14),
-      child: InkWell(
-        onTap: onTap,
-        child: Row(
-          children: [
-            Container(
-              width: 106,
-              height: 132,
-              color: Color(course.colorValue),
-              child: const Icon(
-                Icons.play_lesson_outlined,
-                color: Colors.white,
-                size: 42,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      course.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${course.category} • ${course.level}',
-                      style: const TextStyle(color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: Colors.amber,
-                          size: 18,
-                        ),
-                        Text(' ${course.rating}'),
-                        const Spacer(),
-                        Text(
-                          course.duration,
-                          style: const TextStyle(color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'By ${course.instructor}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CatalogThumb(
+                  icon: _categoryIcon(course.category),
+                  backgroundColor: Color(course.colorValue),
+                  iconColor: Colors.white,
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        course.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _InfoChip(
+                            icon: _categoryIcon(course.category),
+                            label: course.category,
+                          ),
+                          _InfoChip(label: course.level),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _CatalogMetaRow(
+                        rating: course.rating,
+                        duration: course.duration,
+                        extra: 'By ${course.instructor}',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -691,53 +774,409 @@ class LearningCourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: AppTheme.cardDecoration,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Color(course.colorValue),
+                      child: const Icon(Icons.school, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        course.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${course.progress}%',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                LinearProgressIndicator(
+                  value: course.progress / 100,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(8),
+                  color: AppTheme.primaryColor,
+                  backgroundColor: AppTheme.iconBackground,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  course.progress == 0
+                      ? 'Not started yet'
+                      : '${course.progress}% complete',
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.tonal(
+                    onPressed: onContinue,
+                    child: const Text('Continue'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyLearningHeader extends StatelessWidget {
+  const _MyLearningHeader({
+    required this.greeting,
+    required this.onLogout,
+  });
+
+  final String greeting;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: AppTheme.headerGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: Color(course.colorValue),
-                    child: const Icon(Icons.school, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  const Expanded(
                     child: Text(
-                      course.title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                      'My Learning',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ),
-                  Text('${course.progress}%'),
+                  const NotificationBellButton(onDark: true),
+                  const RoleSwitcherButton(onDark: true),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    tooltip: 'Logout',
+                  ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              LinearProgressIndicator(
-                value: course.progress / 100,
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(8),
               ),
               const SizedBox(height: 8),
               Text(
-                '${course.progress}% Complete',
-                style: const TextStyle(color: AppTheme.textSecondary),
+                greeting,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  height: 1.2,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.15,
+                ),
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.tonal(
-                  onPressed: onContinue,
-                  child: const Text('Continue'),
+              const SizedBox(height: 4),
+              Text(
+                'Lessons you added and sessions you booked',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 14,
+                  height: 1.35,
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionsShortcutCard extends StatelessWidget {
+  const _SessionsShortcutCard({
+    required this.upcomingCount,
+    required this.nextSession,
+    required this.onTap,
+  });
+
+  final int upcomingCount;
+  final ProviderSession? nextSession;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = nextSession == null
+        ? 'Upcoming classes, reminders, and feedback'
+        : 'Next: ${nextSession!.lessonTitle} · ${formatDateTime(nextSession!.scheduledAt)}';
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: AppTheme.cardDecoration.copyWith(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.iconBackground,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.event_available_outlined,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'My Sessions',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: upcomingCount == 0
+                        ? AppTheme.backgroundColor
+                        : AppTheme.iconBackground,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    upcomingCount == 0 ? 'None' : '$upcomingCount upcoming',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: upcomingCount == 0
+                          ? AppTheme.textSecondary
+                          : AppTheme.primaryDark,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyLearningEmptyState extends StatelessWidget {
+  const _MyLearningEmptyState({required this.onBrowse});
+
+  final VoidCallback onBrowse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+      decoration: AppTheme.cardDecoration,
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              color: AppTheme.iconBackground,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.menu_book_outlined,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Nothing in My Learning yet',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Open a lesson on Discover and tap Add to My Learning. It will show up here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: onBrowse,
+            child: const Text('Browse lessons'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EnrolledLessonCard extends StatelessWidget {
+  const _EnrolledLessonCard({
+    required this.lesson,
+    required this.onOpen,
+    required this.onRemove,
+    this.nextSession,
+  });
+
+  final Lesson lesson;
+  final VoidCallback onOpen;
+  final VoidCallback onRemove;
+  final ProviderSession? nextSession;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: AppTheme.cardDecoration,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _CatalogThumb(
+                      image: lessonImageProvider(lesson.imageUrl),
+                      icon: _categoryIcon(lesson.category.label),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lesson.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _InfoChip(
+                                icon: _categoryIcon(lesson.category.label),
+                                label: lesson.category.label,
+                              ),
+                              _InfoChip(label: lesson.skillLevel.label),
+                            ],
+                          ),
+                          if (nextSession != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Next session · ${formatDateTime(nextSession!.scheduledAt)}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.primaryDark,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Lesson options',
+                      onSelected: (value) {
+                        if (value == 'remove') onRemove();
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'remove',
+                          child: Text('Remove from My Learning'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonal(
+                    onPressed: onOpen,
+                    child: const Text('Continue'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -801,6 +1240,496 @@ class _CourseHero extends StatelessWidget {
   }
 }
 
+class _DiscoverHeader extends StatelessWidget {
+  const _DiscoverHeader({
+    required this.greeting,
+    required this.searchController,
+    required this.onQueryChanged,
+    required this.onLogout,
+  });
+
+  final String greeting;
+  final TextEditingController searchController;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: AppTheme.headerGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Discover',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                  const NotificationBellButton(onDark: true),
+                  const RoleSwitcherButton(onDark: true),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    tooltip: 'Logout',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                greeting,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  height: 1.2,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Find a skill and start learning today',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 14,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: searchController,
+                onChanged: onQueryChanged,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search lessons, skills, or topics',
+                  hintStyle: const TextStyle(color: AppTheme.textSecondary),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: AppTheme.textSecondary,
+                  ),
+                  suffixIcon: searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            searchController.clear();
+                            onQueryChanged('');
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(
+                      color: Colors.white,
+                      width: 0,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoverSectionHeader extends StatelessWidget {
+  const _DiscoverSectionHeader({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            height: 1.25,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimary,
+            letterSpacing: 0.15,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DiscoverCategoryBar extends StatelessWidget {
+  const _DiscoverCategoryBar({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> categories;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final category = categories[index];
+          final isSelected = category == selected;
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => onSelected(category),
+              borderRadius: BorderRadius.circular(21),
+              child: Ink(
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.primaryColor : Colors.white,
+                  borderRadius: BorderRadius.circular(21),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : const Color(0xFFE2E6EA),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _categoryIcon(category),
+                        size: 16,
+                        color: isSelected
+                            ? Colors.white
+                            : AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        category,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.textPrimary,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          fontSize: 13,
+                          letterSpacing: 0.15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DiscoverEmptyState extends StatelessWidget {
+  const _DiscoverEmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      decoration: AppTheme.cardDecoration,
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
+              color: AppTheme.iconBackground,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: AppTheme.primaryColor),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogThumb extends StatelessWidget {
+  const _CatalogThumb({
+    this.image,
+    required this.icon,
+    this.backgroundColor,
+    this.iconColor,
+  });
+
+  final ImageProvider? image;
+  final IconData icon;
+  final Color? backgroundColor;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: 88,
+        height: 88,
+        child: image == null
+            ? _placeholder()
+            : Image(
+                image: image!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _placeholder(),
+              ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return ColoredBox(
+      color: backgroundColor ?? AppTheme.iconBackground,
+      child: Icon(
+        icon,
+        color: iconColor ?? AppTheme.primaryColor,
+        size: 32,
+      ),
+    );
+  }
+}
+
+class _PriceBadge extends StatelessWidget {
+  const _PriceBadge({required this.label, required this.emphasize});
+
+  final String label;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: emphasize ? AppTheme.statusActiveBg : AppTheme.iconBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: emphasize ? AppTheme.statusActiveText : AppTheme.primaryDark,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({this.icon, required this.label});
+
+  final IconData? icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: AppTheme.primaryColor),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogMetaRow extends StatelessWidget {
+  const _CatalogMetaRow({
+    required this.rating,
+    required this.duration,
+    this.extra,
+  });
+
+  final double rating;
+  final String duration;
+  final String? extra;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <Widget>[
+      Icon(
+        rating == 0 ? Icons.auto_awesome_rounded : Icons.star_rounded,
+        color: rating == 0 ? AppTheme.primaryColor : const Color(0xFFF5A623),
+        size: 15,
+      ),
+      const SizedBox(width: 3),
+      Text(
+        rating == 0 ? 'New' : rating.toStringAsFixed(1),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimary,
+        ),
+      ),
+      if (duration.trim().isNotEmpty) ...[
+        _metaDot(),
+        Flexible(
+          child: Text(
+            duration,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+        ),
+      ],
+      if (extra != null && extra!.trim().isNotEmpty) ...[
+        _metaDot(),
+        Flexible(
+          child: Text(
+            extra!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+        ),
+      ],
+    ];
+
+    return Row(children: items);
+  }
+
+  Widget _metaDot() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Container(
+        width: 3,
+        height: 3,
+        decoration: const BoxDecoration(
+          color: AppTheme.textSecondary,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
+IconData _categoryIcon(String category) {
+  switch (category.toLowerCase()) {
+    case 'all':
+      return Icons.apps_rounded;
+    case 'mobile':
+      return Icons.smartphone_rounded;
+    case 'web':
+      return Icons.language_rounded;
+    case 'ai':
+      return Icons.auto_awesome_rounded;
+    case 'ui/ux':
+    case 'design':
+      return Icons.palette_outlined;
+    case 'backend':
+    case 'database':
+      return Icons.storage_rounded;
+    case 'programming':
+      return Icons.code_rounded;
+    case 'business':
+      return Icons.work_outline_rounded;
+    case 'languages':
+      return Icons.translate_rounded;
+    case 'music':
+      return Icons.music_note_rounded;
+    case 'photography':
+      return Icons.photo_camera_outlined;
+    case 'cooking':
+      return Icons.restaurant_rounded;
+    default:
+      return Icons.category_outlined;
+  }
+}
+
 class _LearningNav extends StatelessWidget {
   const _LearningNav({required this.index});
 
@@ -810,17 +1739,19 @@ class _LearningNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return NavigationBar(
       selectedIndex: index,
+      backgroundColor: Colors.white,
+      indicatorColor: AppTheme.iconBackground,
       onDestinationSelected: (value) =>
           context.go(value == 0 ? '/learning' : '/learning/my-courses'),
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.explore_outlined),
-          selectedIcon: Icon(Icons.explore),
+          selectedIcon: Icon(Icons.explore, color: AppTheme.primaryColor),
           label: 'Discover',
         ),
         NavigationDestination(
           icon: Icon(Icons.play_lesson_outlined),
-          selectedIcon: Icon(Icons.play_lesson),
+          selectedIcon: Icon(Icons.play_lesson, color: AppTheme.primaryColor),
           label: 'My Learning',
         ),
       ],

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
+import '../../../core/utils/lesson_image.dart';
 import '../../../models/lesson.dart';
 import '../widgets/app_header.dart';
 import '../widgets/status_chip.dart';
@@ -247,31 +248,15 @@ class LessonDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildThumbnail() {
-    final url = lesson.imageUrl;
-    final hasImage = url != null &&
-        url.isNotEmpty &&
-        !url.contains('placeholder.peerlearnhub.com');
+    final image = lessonImageProvider(lesson.imageUrl);
+    if (image == null) return _thumbnailPlaceholder();
 
-    if (hasImage && url.startsWith('data:image/')) {
-      final data = Uri.tryParse(url)?.data;
-      if (data != null) {
-        return Image.memory(
-          data.contentAsBytes(),
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
-        );
-      }
-    }
-
-    if (hasImage && url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
-      );
-    }
-
-    return _thumbnailPlaceholder();
+    return Image(
+      image: image,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      errorBuilder: (_, _, _) => _thumbnailPlaceholder(),
+    );
   }
 
   Widget _thumbnailPlaceholder() {

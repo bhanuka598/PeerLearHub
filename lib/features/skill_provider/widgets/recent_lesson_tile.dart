@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
+import '../../../core/utils/lesson_image.dart';
 import '../../../models/lesson.dart';
 import 'status_chip.dart';
 
@@ -72,30 +73,14 @@ class RecentLessonTile extends StatelessWidget {
   }
 
   Widget _thumb() {
-    final url = lesson.imageUrl?.trim();
-    final hasImage = url != null &&
-        url.isNotEmpty &&
-        !url.contains('placeholder.peerlearnhub.com');
-
-    Widget image;
-    if (hasImage && url.startsWith('data:image/')) {
-      final data = Uri.tryParse(url)?.data;
-      image = data != null
-          ? Image.memory(
-              data.contentAsBytes(),
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _placeholder(),
-            )
-          : _placeholder();
-    } else if (hasImage && url.startsWith('http')) {
-      image = Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _placeholder(),
-      );
-    } else {
-      image = _placeholder();
-    }
+    final provider = lessonImageProvider(lesson.imageUrl);
+    final image = provider == null
+        ? _placeholder()
+        : Image(
+            image: provider,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _placeholder(),
+          );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),

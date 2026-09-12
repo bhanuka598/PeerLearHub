@@ -73,6 +73,7 @@ class AppAuth extends ChangeNotifier {
     const allowedForGuest = [
       '/',
       '/loading',
+      '/welcome',
       '/login',
       '/register',
       '/forgot-password',

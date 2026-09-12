@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
+import '../../../core/utils/lesson_image.dart';
 import '../../../models/lesson.dart';
 import '../services/storage_service.dart';
 import '../utils/pick_local_image.dart';
@@ -370,7 +371,7 @@ class LessonFormState extends State<LessonForm> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Image added. It will be saved with the lesson.'),
+            content: Text('Could not prepare the thumbnail. Try a smaller image.'),
           ),
         );
       }
@@ -935,27 +936,16 @@ class LessonFormState extends State<LessonForm> {
     if (_imageBytes != null) {
       return Image.memory(_imageBytes!, fit: BoxFit.cover);
     }
-    final url = _imageUrl;
-    if (url != null && url.startsWith('data:image/')) {
-      final data = Uri.parse(url).data;
-      if (data != null) {
-        return Image.memory(data.contentAsBytes(), fit: BoxFit.cover);
-      }
+    final image = lessonImageProvider(_imageUrl);
+    if (image != null) {
+      return Image(image: image, fit: BoxFit.cover);
     }
-    return Image.network(url!, fit: BoxFit.cover);
+    return const SizedBox.shrink();
   }
 
   Widget _buildImagePlaceholder() {
     final hasPreview = _imageBytes != null;
-    final hasDataImage = !hasPreview &&
-        _imageUrl != null &&
-        _imageUrl!.startsWith('data:image/');
-    final hasNetworkImage = !hasPreview &&
-        !hasDataImage &&
-        _imageUrl != null &&
-        _imageUrl!.startsWith('http') &&
-        !_imageUrl!.contains('placeholder.peerlearnhub.com');
-    final hasImage = hasPreview || hasDataImage || hasNetworkImage;
+    final hasImage = hasPreview || lessonImageProvider(_imageUrl) != null;
 
     return Material(
       color: Colors.transparent,
