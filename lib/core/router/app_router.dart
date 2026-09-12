@@ -1,6 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/core/auth/app_auth.dart';
-import 'package:peer_learn_hub/features/moderation/screens/moderator_dashboard_screen.dart';
+import 'package:peer_learn_hub/features/moderation/screens/moderator_guard_screen.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_course.dart';
 import 'package:peer_learn_hub/features/learning/screens/learning_screens.dart';
 import 'package:peer_learn_hub/features/skill_exchange/skill_exchange.dart';
@@ -102,7 +102,7 @@ class RouterClass {
       ),
       GoRoute(
         path: '/moderation',
-        builder: (context, state) => const ModeratorDashboardScreen(),
+        builder: (context, state) => const ModeratorGuardScreen(),
       ),
     ],
   );

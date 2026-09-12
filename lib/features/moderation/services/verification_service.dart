@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/verification_request.dart';
+import 'activity_log_service.dart';
 
 class VerificationService {
   // Flag to use mock data (set to true when Firebase is not configured)
   static bool useMockData = false;
   
   final String _collection = 'verificationRequests';
+  final ActivityLogService _activityLogService = ActivityLogService();
 
   // Get all verification requests
   Stream<List<VerificationRequest>> getVerificationRequests() {
@@ -36,11 +38,15 @@ class VerificationService {
     return FirebaseFirestore.instance
         .collection(_collection)
         .where('status', isEqualTo: status.name)
-        .orderBy('submittedAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => VerificationRequest.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+          final requests = snapshot.docs
+              .map((doc) => VerificationRequest.fromFirestore(doc))
+              .toList();
+          // Sort in Dart instead of Firestore to avoid index requirement
+          requests.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+          return requests;
+        });
   }
 
   // Get verification request by ID
@@ -71,11 +77,30 @@ class VerificationService {
       return;
     }
     
+    // Get the request details before updating
+    final request = await getVerificationRequestById(requestId);
+    
     await FirebaseFirestore.instance.collection(_collection).doc(requestId).update({
       'status': VerificationStatus.approved.name,
       'reviewedAt': FieldValue.serverTimestamp(),
       'reviewedBy': moderatorId,
     });
+    
+    // Log the activity
+    if (request != null) {
+      await _activityLogService.logAction(
+        moderatorId: moderatorId,
+        moderatorName: 'Moderator', // TODO: Get from user profile
+        actionType: 'verification_approved',
+        targetId: requestId,
+        targetUserId: request.userId,
+        description: 'Approved ${request.verificationType.displayName} verification for ${request.userName}',
+        metadata: {
+          'verificationType': request.verificationType.name,
+          'skillName': request.skillName,
+        },
+      );
+    }
   }
 
   // Reject verification request
@@ -90,12 +115,31 @@ class VerificationService {
       return;
     }
     
+    // Get the request details before updating
+    final request = await getVerificationRequestById(requestId);
+    
     await FirebaseFirestore.instance.collection(_collection).doc(requestId).update({
       'status': VerificationStatus.rejected.name,
       'reviewedAt': FieldValue.serverTimestamp(),
       'reviewedBy': moderatorId,
       'rejectionReason': rejectionReason,
     });
+    
+    // Log the activity
+    if (request != null) {
+      await _activityLogService.logAction(
+        moderatorId: moderatorId,
+        moderatorName: 'Moderator', // TODO: Get from user profile
+        actionType: 'verification_rejected',
+        targetId: requestId,
+        targetUserId: request.userId,
+        description: 'Rejected ${request.verificationType.displayName} verification for ${request.userName}',
+        metadata: {
+          'verificationType': request.verificationType.name,
+          'rejectionReason': rejectionReason,
+        },
+      );
+    }
   }
 
   // Get statistics

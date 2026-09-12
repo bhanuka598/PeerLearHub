@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../services/activity_log_service.dart';
+import '../services/auth_service.dart';
+import '../models/moderation_activity.dart';
 
 class ModerationActionsScreen extends StatefulWidget {
   const ModerationActionsScreen({super.key});
@@ -10,6 +13,9 @@ class ModerationActionsScreen extends StatefulWidget {
 }
 
 class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
+  final ActivityLogService _activityLogService = ActivityLogService();
+  final ModeratorAuthService _authService = ModeratorAuthService();
+  
   String _selectedFilter = 'All';
   final List<String> _filterOptions = ['All', 'Warnings', 'Bans', 'Dismissed'];
 
@@ -93,38 +99,69 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
 
           // Actions List
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildActionItem(
-                  'Warning to @dev_kumar',
-                  'Reason: Repeated spamming in HTML lounge',
-                  'By Navodya • 10m ago',
-                  Colors.orange,
-                  'WARNING',
-                ),
-                _buildActionItem(
-                  'Ban on @toxic_troll',
-                  'Reason: Offensive behavior & hate speech',
-                  'By Navodya • 1h ago',
-                  Colors.red,
-                  'TEMP BAN',
-                ),
-                _buildActionItem(
-                  'Dismissed Report #1084',
-                  'Reason: Insufficient evidence of rule breach',
-                  'By Navodya • 4h ago',
-                  Colors.grey,
-                  'DISMISSED',
-                ),
-                _buildActionItem(
-                  'Ban on @crypto_spam',
-                  'Reason: Systematic commercial fraud adverti...',
-                  'By Navodya • 1d ago',
-                  Colors.red,
-                  'PERM BAN',
-                ),
-              ],
+            child: StreamBuilder<List<ModerationActivity>>(
+              stream: _activityLogService.getModeratorActivities(_authService.getCurrentUserId()!),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Error loading actions'));
+                }
+
+                var activities = snapshot.data ?? [];
+
+                // Filter activities based on selected filter
+                if (_selectedFilter != 'All') {
+                  activities = activities.where((activity) {
+                    if (_selectedFilter == 'Warnings' && activity.actionType == 'warning_issued') {
+                      return true;
+                    }
+                    if (_selectedFilter == 'Bans' && 
+                        (activity.actionType == 'user_banned' || 
+                         activity.actionType.contains('ban'))) {
+                      return true;
+                    }
+                    if (_selectedFilter == 'Dismissed' && 
+                        activity.actionType == 'report_dismissed') {
+                      return true;
+                    }
+                    return false;
+                  }).toList();
+                }
+
+                if (activities.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No actions yet',
+                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: activities.length,
+                  itemBuilder: (context, index) {
+                    final activity = activities[index];
+                    return _buildActionItem(
+                      activity.description,
+                      'Target: ${activity.targetUserId}',
+                      'By ${activity.moderatorName} • ${_getTimeAgo(activity.timestamp)}',
+                      activity.getActionColor(),
+                      _getActionBadge(activity.actionType),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
@@ -259,5 +296,39 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
         ],
       ),
     );
+  }
+
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+
+  String _getActionBadge(String actionType) {
+    switch (actionType) {
+      case 'warning_issued':
+        return 'WARNING';
+      case 'user_banned':
+        return 'PERM BAN';
+      case 'report_dismissed':
+        return 'DISMISSED';
+      case 'report_resolved':
+        return 'RESOLVED';
+      case 'verification_approved':
+        return 'APPROVED';
+      case 'verification_rejected':
+        return 'REJECTED';
+      default:
+        return 'ACTION';
+    }
   }
 }

@@ -1,11 +1,74 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../../../core/constants/app_colors.dart';
+import '../services/community_safety_service.dart';
 
-class CommunitySafetyScreen extends StatelessWidget {
+class CommunitySafetyScreen extends StatefulWidget {
   const CommunitySafetyScreen({super.key});
 
   @override
+  State<CommunitySafetyScreen> createState() => _CommunitySafetyScreenState();
+}
+
+class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
+  final CommunitySafetyService _safetyService = CommunitySafetyService();
+  double _trustIndex = 87.0;
+  Map<String, int> _trustDistribution = {};
+  List<int> _reportVolume = [];
+  Map<String, int> _topCategories = {};
+  List<Map<String, dynamic>> _alerts = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    
+    final trustIndex = await _safetyService.calculateTrustIndex();
+    final trustDistribution = await _safetyService.getTrustScoreDistribution();
+    final reportVolume = await _safetyService.getReportVolume();
+    final topCategories = await _safetyService.getTopCategories();
+    final alerts = await _safetyService.getSafetyAlerts();
+
+    setState(() {
+      _trustIndex = trustIndex;
+      _trustDistribution = trustDistribution;
+      _reportVolume = reportVolume;
+      _topCategories = topCategories;
+      _alerts = alerts;
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Community Safety',
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -73,9 +136,9 @@ class CommunitySafetyScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Excellent',
-                            style: TextStyle(
+                          Text(
+                            _getTrustLabel(_trustIndex),
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                               color: Colors.black87,
@@ -96,8 +159,8 @@ class CommunitySafetyScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            '892 / 34',
+                          Text(
+                            '${_trustDistribution['excellent'] ?? 0} / ${_alerts.length}',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -119,21 +182,21 @@ class CommunitySafetyScreen extends StatelessWidget {
                           width: 120,
                           height: 120,
                           child: CircularProgressIndicator(
-                            value: 0.87,
+                            value: _trustIndex / 100,
                             strokeWidth: 12,
                             backgroundColor: Colors.grey[200],
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.primaryTeal,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _getTrustColor(_trustIndex),
                             ),
                           ),
                         ),
-                        const Center(
+                        Center(
                           child: Text(
-                            '87%',
+                            '${_trustIndex.toInt()}%',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.primaryTeal,
+                              color: _getTrustColor(_trustIndex),
                             ),
                           ),
                         ),
@@ -453,5 +516,19 @@ class CommunitySafetyScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getTrustLabel(double trustIndex) {
+    if (trustIndex >= 90) return 'Excellent';
+    if (trustIndex >= 75) return 'Good';
+    if (trustIndex >= 50) return 'Fair';
+    return 'Poor';
+  }
+
+  Color _getTrustColor(double trustIndex) {
+    if (trustIndex >= 90) return AppColors.primaryTeal;
+    if (trustIndex >= 75) return Colors.green;
+    if (trustIndex >= 50) return Colors.orange;
+    return Colors.red;
   }
 }
