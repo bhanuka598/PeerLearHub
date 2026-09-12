@@ -88,9 +88,7 @@ class AppAuth extends ChangeNotifier {
 
   Future<bool> registerAsModerator() async {
     try {
-      final userData = await AuthService.instance.registerAsModerator(
-        adminKey: adminKey,
-      );
+      final userData = await AuthService.instance.registerAsModerator();
 
       // Update role based on response
       final roleString = userData['role'] as String?;

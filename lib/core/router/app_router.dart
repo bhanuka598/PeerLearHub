@@ -41,6 +41,9 @@ class RouterClass {
     refreshListenable: AppAuth.instance,
     redirect: (context, state) {
       final location = state.matchedLocation;
+      if (!SplashScreen.hasCompleted && location == '/welcome') {
+        return '/';
+      }
       if (!AppAuth.instance.canAccess(location)) {
         return AppAuth.instance.getHomeRoute();
       }
