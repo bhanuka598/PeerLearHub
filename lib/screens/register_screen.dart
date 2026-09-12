@@ -127,26 +127,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) {
         return;
       }
-
+      
+      // Fetch user role from backend and respect the API redirect for moderators.
       try {
         final loginData = await AuthService.instance.loginWithRole();
         final roleString = loginData['user']['role'] as String?;
+        final redirectRoute = (loginData['redirectRoute'] as String?) ??
+            AppAuth.instance.getHomeRouteForRole(roleString);
 
-        switch (roleString) {
-          case 'moderator':
-            AppAuth.instance.setRole(AppUserRole.moderator);
-            break;
-          case 'teacher':
-            AppAuth.instance.setRole(AppUserRole.teacher);
-            break;
-          case 'admin':
-            AppAuth.instance.setRole(AppUserRole.admin);
-            break;
-          default:
-            AppAuth.instance.setRole(AppUserRole.student);
-        }
-      } catch (_) {
-        AppAuth.instance.setRole(AppUserRole.student);
+        AppAuth.instance.setRoleFromApi(roleString);
+        context.go(redirectRoute);
+        return;
+      } catch (e) {
+        final fallbackRole = await AuthService.instance.getCurrentUserRole();
+        AppAuth.instance.setRoleFromApi(fallbackRole);
       }
 
       context.go(AppAuth.instance.getHomeRoute());

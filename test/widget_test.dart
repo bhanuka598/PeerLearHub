@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/main.dart';
 
 void main() {
@@ -22,5 +23,14 @@ void main() {
       find.text('Learn skills. Connect with people. Grow together.'),
       findsOneWidget,
     );
+  });
+
+  test('moderator login resolves to the moderator dashboard route', () {
+    AppAuth.instance.setRoleFromApi('moderator');
+
+    expect(AppAuth.instance.currentRole, AppUserRole.moderator);
+    expect(AppAuth.instance.getHomeRoute(), '/moderation');
+
+    AppAuth.instance.setRole(AppUserRole.student);
   });
 }

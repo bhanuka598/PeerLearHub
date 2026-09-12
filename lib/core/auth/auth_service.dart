@@ -277,6 +277,27 @@ class AuthService {
     }
   }
 
+  Future<String> getCurrentUserRole() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      return 'student';
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDoc.data();
+      final role = (userData?['role'] as String?)?.trim().toLowerCase();
+      return role == null || role.isEmpty ? 'student' : role;
+    } catch (e) {
+      debugPrint('Error getting current user role: $e');
+      return 'student';
+    }
+  }
+
   Future<bool> isModerator() async {
     final user = _firebaseAuth?.currentUser;
     if (user == null) {
@@ -288,7 +309,7 @@ class AuthService {
           .collection('users')
           .doc(user.uid)
           .get();
-      
+
       if (!userDoc.exists) {
         return false;
       }
