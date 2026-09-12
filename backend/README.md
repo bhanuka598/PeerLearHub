@@ -16,6 +16,8 @@ This folder contains the Express API that validates Firebase ID tokens used by t
 
 - GET /api/health
 - POST /api/auth/verify-token
+- POST /api/auth/password-reset/request
+- POST /api/auth/password-reset/verify
 
 Expected request body:
 
@@ -27,21 +29,23 @@ Expected request body:
 
 The Flutter app sends the Firebase Google ID token after the Google sign-in step. The backend verifies it with Firebase Admin before accepting the user session.
 
-## Test teacher and admin accounts
+## Password reset OTP
 
-Google accounts are students by default. Assign a Firebase custom claim from the backend folder:
+The password reset flow sends a six-digit OTP by email instead of a reset link. Configure SMTP in `backend/.env` using the values shown in `.env.example`:
 
-```bash
-npm run set-role -- user@example.com teacher
-npm run set-role -- user@example.com admin
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-smtp-username
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM=PeerLearnHub <no-reply@example.com>
 ```
 
-The account must sign out and sign in again after changing its role. The backend only accepts `student`, `teacher`, and `admin`; unknown or missing claims fall back to `student`.
+Start the backend before using Forgot Password. Codes expire after 10 minutes and are limited to five verification attempts. The OTP is stored only as a hash in the backend process and is removed after successful use or expiry.
 
-To test the first-login role picker again for an existing account, reset it locally from the backend folder:
+## Role switching
 
-```bash
-npm run reset-role -- user@example.com
-```
+Roles are session-level UI state in the Flutter app and are not stored as Firebase custom claims. After signing in, use the role switcher in the app bar or dashboard header to move between Student and Teacher mode.
 
-Then sign out, sign in with Google again, choose a role, and restart the app. The selected role will be reused and the picker will not appear again.
+Both modes can learn courses and create courses. Completing a course does not permanently change the account role; a student can switch to Teacher mode whenever they are ready to teach, and a teacher can switch back to Student mode to learn.

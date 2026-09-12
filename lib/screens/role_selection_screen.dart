@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:peer_learn_hub/core/auth/app_auth.dart';
-import 'package:peer_learn_hub/core/auth/auth_service.dart';
 import 'package:peer_learn_hub/core/theme/app_theme.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -13,35 +12,15 @@ class RoleSelectionScreen extends StatefulWidget {
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   AppUserRole? _selectedRole;
-  bool _isSaving = false;
 
-  Future<void> _saveRole() async {
+  void _saveRole() {
     final selectedRole = _selectedRole;
-    if (selectedRole == null || _isSaving) {
+    if (selectedRole == null) {
       return;
     }
 
-    setState(() => _isSaving = true);
-    final saved = await AppAuth.instance.saveGoogleRole(selectedRole);
-
-    if (!mounted) {
-      return;
-    }
-
-    if (saved) {
-      context.go(AppAuth.instance.getHomeRoute());
-    } else {
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AuthService.instance.lastError ??
-                'Unable to save your role. Please try again.',
-          ),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    }
+    AppAuth.instance.switchRole(selectedRole);
+    context.go(AppAuth.instance.getHomeRoute());
   }
 
   @override
@@ -108,9 +87,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _selectedRole == null || _isSaving
-                          ? null
-                          : _saveRole,
+                      onPressed: _selectedRole == null ? null : _saveRole,
                       style: FilledButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
                         foregroundColor: Colors.white,
@@ -119,19 +96,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Save & Continue',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
+                      child: const Text(
+                        'Save & Continue',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                 ],

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,11 +8,13 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { cert } from 'firebase-admin/app';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+const otpStore = new Map();
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
@@ -81,17 +84,6 @@ app.post('/api/auth/verify-token', async (req, res) => {
     }
 
     const decodedToken = await getAuth().verifyIdToken(idToken);
-    const userSnapshot = await getFirestore()
-      .collection('users')
-      .doc(decodedToken.uid)
-      .get();
-    const savedRole = userSnapshot.data()?.role;
-    const claimRole = ['teacher', 'admin'].includes(decodedToken.role)
-      ? decodedToken.role
-      : null;
-    const role = ['student', 'teacher', 'admin'].includes(savedRole)
-      ? savedRole
-      : claimRole;
 
     return res.json({
       success: true,
@@ -101,7 +93,6 @@ app.post('/api/auth/verify-token', async (req, res) => {
         name: decodedToken.name ?? null,
         picture: decodedToken.picture ?? null,
         provider: decodedToken.firebase?.sign_in_provider ?? 'firebase',
-        role,
       },
     });
   } catch (error) {
@@ -121,57 +112,86 @@ app.post('/api/auth/verify-token', async (req, res) => {
   }
 });
 
-app.post('/api/auth/role', async (req, res) => {
-  try {
-    const authorization = req.headers.authorization ?? '';
-    const idToken = authorization.startsWith('Bearer ')
-      ? authorization.substring('Bearer '.length)
-      : '';
-    const { role } = req.body ?? {};
+function hashOtp(otp) {
+  return crypto.createHash('sha256').update(otp).digest('hex');
+}
 
-    if (!idToken || !['student', 'teacher', 'admin'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'A valid Firebase token and role are required.',
-      });
+function getMailTransport() {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env;
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASSWORD) {
+    throw new Error('SMTP configuration is missing.');
+  }
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
+  });
+}
+
+app.post('/api/auth/password-reset/request', async (req, res) => {
+  try {
+    const email = String(req.body?.email ?? '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required.' });
     }
 
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    const userReference = getFirestore()
-      .collection('users')
-      .doc(decodedToken.uid);
-    const result = await getFirestore().runTransaction(async (transaction) => {
-      const savedUser = await transaction.get(userReference);
-      const existingRole = savedUser.data()?.role;
-      if (savedUser.exists && existingRole) {
-        return { role: existingRole, created: false };
-      }
-
-      transaction.set(
-        userReference,
-        {
-          uid: decodedToken.uid,
-          email: decodedToken.email ?? null,
-          displayName: decodedToken.name ?? null,
-          role,
-          createdAt: new Date().toISOString(),
-        },
-        { merge: true },
-      );
-      return { role, created: true };
+    const user = await getAuth().getUserByEmail(email);
+    const otp = String(crypto.randomInt(100000, 1000000));
+    otpStore.set(email, {
+      hash: hashOtp(otp),
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      attempts: 0,
+      uid: user.uid,
     });
 
-    return res.status(result.created ? 201 : 200).json({
-      success: true,
-      role: result.role,
-      locked: true,
+    await getMailTransport().sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: 'PeerLearnHub password reset code',
+      text: `Your PeerLearnHub password reset code is ${otp}. It expires in 10 minutes.`,
+      html: `<p>Your PeerLearnHub password reset code is:</p><h2>${otp}</h2><p>This code expires in 10 minutes.</p>`,
     });
+
+    return res.json({ success: true, message: 'Verification code sent.' });
   } catch (error) {
-    console.error('Role persistence failed:', error);
-    return res.status(401).json({
-      success: false,
-      message: 'Unable to save the account role.',
-    });
+    if (error?.code === 'auth/user-not-found') {
+      return res.status(404).json({ success: false, message: 'No account exists for this email.' });
+    }
+    console.error('Password reset request failed:', error);
+    return res.status(503).json({ success: false, message: 'Unable to send the verification code.' });
+  }
+});
+
+app.post('/api/auth/password-reset/verify', async (req, res) => {
+  try {
+    const email = String(req.body?.email ?? '').trim().toLowerCase();
+    const otp = String(req.body?.otp ?? '').trim();
+    const newPassword = String(req.body?.newPassword ?? '');
+    const pending = otpStore.get(email);
+
+    if (!pending || pending.expiresAt < Date.now()) {
+      otpStore.delete(email);
+      return res.status(400).json({ success: false, message: 'The code is invalid or expired.' });
+    }
+    if (pending.attempts >= 5) {
+      otpStore.delete(email);
+      return res.status(429).json({ success: false, message: 'Too many attempts. Request a new code.' });
+    }
+    pending.attempts += 1;
+    if (!/^\d{6}$/.test(otp) || hashOtp(otp) !== pending.hash) {
+      return res.status(400).json({ success: false, message: 'The verification code is incorrect.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+    }
+
+    await getAuth().updateUser(pending.uid, { password: newPassword });
+    otpStore.delete(email);
+    return res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Password reset verification failed:', error);
+    return res.status(500).json({ success: false, message: 'Unable to reset the password.' });
   }
 });
 

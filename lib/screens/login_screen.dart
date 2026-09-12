@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
@@ -51,31 +52,32 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
 
-    if (password.length < 6) {
-      _showError('Invalid email or password');
-      return;
-    }
-
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-
-    if (!mounted) {
-      return;
-    }
-
-    if (email.contains('admin')) {
-      AppAuth.instance.setRole(AppUserRole.admin);
-    } else if (email.contains('teacher') || email.contains('lecturer')) {
-      AppAuth.instance.setRole(AppUserRole.teacher);
-    } else {
+    try {
+      await AuthService.instance.signInWithEmail(
+        email: _emailController.text,
+        password: password,
+      );
+      if (!mounted) {
+        return;
+      }
       AppAuth.instance.setRole(AppUserRole.student);
+      context.go(AppAuth.instance.getHomeRoute());
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        _showError(AuthService.instance.authErrorMessage(error));
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        _showError(error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
-
-    setState(() => _isSubmitting = false);
-    context.go(AppAuth.instance.getHomeRoute());
   }
 
   Future<void> _signInWithGoogle() async {

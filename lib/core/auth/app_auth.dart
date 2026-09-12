@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:peer_learn_hub/core/auth/auth_service.dart';
 
 enum AppUserRole { student, teacher, admin }
 
-class AppAuth {
+class AppAuth extends ChangeNotifier {
   AppAuth._();
 
   static final AppAuth instance = AppAuth._();
@@ -13,42 +14,27 @@ class AppAuth {
 
   void setRole(AppUserRole role) {
     _currentRole = role;
+    notifyListeners();
+  }
+
+  void switchRole(AppUserRole role) {
+    _currentRole = role;
+    notifyListeners();
   }
 
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      final role = AuthService.instance.authenticatedRole;
-      if (role != null) {
-        setRole(_roleFromName(role));
-      }
+      // Default to student for standard users
+      setRole(AppUserRole.student);
     }
     return signedIn;
   }
 
-  Future<bool> saveGoogleRole(AppUserRole role) async {
-    try {
-      final savedRole = await AuthService.instance.saveRole(role.name);
-      if (savedRole == null) {
-        return false;
-      }
-      setRole(_roleFromName(savedRole));
-      return true;
-    } on Exception {
-      return false;
-    }
-  }
-
-  AppUserRole _roleFromName(String role) {
-    return switch (role) {
-      'teacher' => AppUserRole.teacher,
-      'admin' => AppUserRole.admin,
-      _ => AppUserRole.student,
-    };
-  }
-
   void logout() {
     _currentRole = null;
+    AuthService.instance.signOut();
+    notifyListeners();
   }
 
   String getHomeRoute() {
@@ -73,7 +59,6 @@ class AppAuth {
       '/register',
       '/forgot-password',
       '/otp-verification',
-      '/select-role',
     ];
     if (allowedForGuest.contains(cleanLocation)) {
       return true;
@@ -85,9 +70,17 @@ class AppAuth {
             cleanLocation == '/learning/my-courses' ||
             cleanLocation == '/learning/course' ||
             cleanLocation == '/learning/lesson' ||
-            cleanLocation == '/skill-exchange';
+            cleanLocation == '/skill-exchange' ||
+            cleanLocation == '/skill-provider' ||
+            cleanLocation == '/skill-provider/my-lessons' ||
+            cleanLocation == '/skill-provider/create' ||
+            cleanLocation == '/skill-provider/edit';
       case AppUserRole.teacher:
-        return cleanLocation == '/skill-exchange' ||
+        return cleanLocation == '/learning' ||
+            cleanLocation == '/learning/my-courses' ||
+            cleanLocation == '/learning/course' ||
+            cleanLocation == '/learning/lesson' ||
+            cleanLocation == '/skill-exchange' ||
             cleanLocation == '/skill-provider' ||
             cleanLocation == '/skill-provider/my-lessons' ||
             cleanLocation == '/skill-provider/create' ||

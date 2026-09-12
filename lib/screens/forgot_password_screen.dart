@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/auth/auth_service.dart';
 import '../core/theme/app_theme.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -25,16 +27,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
 
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-
-    if (!mounted) {
-      return;
+    setState(() => _isSubmitting = true);
+    try {
+      await AuthService.instance.requestPasswordResetCode(
+        _emailController.text,
+      );
+      if (mounted) {
+        context.go(
+          '/otp-verification?email=${Uri.encodeComponent(_emailController.text.trim())}&mode=reset',
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reset link sent successfully')),
-    );
-    context.go('/login');
   }
 
   @override
@@ -111,10 +127,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Text(
-                      'Send Reset Link',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Send Verification Code',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
