@@ -3,6 +3,8 @@ import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/features/moderation/screens/moderator_guard_screen.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_course.dart';
 import 'package:peer_learn_hub/features/learning/screens/learning_screens.dart';
+import 'package:peer_learn_hub/features/learning/models/learning_quiz.dart';
+import 'package:peer_learn_hub/features/learning/screens/assignment_screen.dart';
 import 'package:peer_learn_hub/features/skill_exchange/skill_exchange.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/create_lesson_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/edit_lesson_screen.dart';
@@ -12,7 +14,9 @@ import 'package:peer_learn_hub/models/lesson.dart';
 import 'package:peer_learn_hub/screens/forgot_password_screen.dart';
 import 'package:peer_learn_hub/screens/loading_screen.dart';
 import 'package:peer_learn_hub/screens/login_screen.dart';
+import 'package:peer_learn_hub/screens/moderator_register_screen.dart';
 import 'package:peer_learn_hub/screens/otp_verification_screen.dart';
+import 'package:peer_learn_hub/screens/profile_screen.dart';
 import 'package:peer_learn_hub/screens/register_screen.dart';
 
 class RouterClass {
@@ -36,6 +40,10 @@ class RouterClass {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/moderation/register',
+        builder: (context, state) => const ModeratorRegisterScreen(),
       ),
       GoRoute(
         path: '/forgot-password',
@@ -77,6 +85,28 @@ class RouterClass {
               ? LessonViewScreen(course: course)
               : const MyLearningScreen();
         },
+      ),
+      GoRoute(
+        path: '/learning/quiz',
+        builder: (context, state) {
+          final quiz = state.extra;
+          return quiz is LearningQuiz
+              ? QuizScreen(quiz: quiz)
+              : const MyLearningScreen();
+        },
+      ),
+      GoRoute(
+        path: '/learning/assignment',
+        builder: (context, state) {
+          final course = state.extra;
+          return course is LearningCourse
+              ? AssignmentScreen(course: course)
+              : const MyLearningScreen();
+        },
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/skill-provider',
