@@ -2,10 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/auth/auth_service.dart';
 import '../core/theme/app_theme.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
-  const OtpVerificationScreen({super.key});
+  const OtpVerificationScreen({
+    super.key,
+    this.email,
+    this.isPasswordReset = false,
+  });
+
+  final String? email;
+  final bool isPasswordReset;
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -18,6 +26,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   );
 
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   bool _isVerifying = false;
   int _countdown = 30;
@@ -36,6 +46,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     for (final focusNode in _focusNodes) {
       focusNode.dispose();
     }
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -70,13 +82,45 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       return;
     }
 
-    setState(() => _isVerifying = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) {
-      return;
+    if (widget.isPasswordReset) {
+      if (_newPasswordController.text.length < 6) {
+        _showError('New password must be at least 6 characters.');
+        return;
+      }
+      if (_newPasswordController.text != _confirmPasswordController.text) {
+        _showError('Passwords do not match.');
+        return;
+      }
     }
-    setState(() => _isVerifying = false);
-    context.go('/learning');
+
+    setState(() => _isVerifying = true);
+    try {
+      if (widget.isPasswordReset) {
+        await AuthService.instance.verifyPasswordResetCode(
+          email: widget.email ?? '',
+          otp: code,
+          newPassword: _newPasswordController.text,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password updated successfully.')),
+          );
+          context.go('/login');
+        }
+      } else {
+        if (mounted) context.go('/learning');
+      }
+    } on Exception catch (error) {
+      if (mounted) _showError(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isVerifying = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -93,7 +137,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () => context.canPop() ? context.pop() : null,
                   icon: const Icon(Icons.arrow_back_ios_new_rounded),
                   style: IconButton.styleFrom(
                     backgroundColor: AppTheme.iconBackground,
@@ -117,6 +161,26 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   ),
                 ),
                 const SizedBox(height: 30),
+                if (widget.isPasswordReset) ...[
+                  TextFormField(
+                    controller: _newPasswordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm New Password',
+                      prefixIcon: Icon(Icons.lock_reset_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(6, (index) {

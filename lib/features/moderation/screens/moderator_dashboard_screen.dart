@@ -81,6 +81,13 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
             tooltip: 'Refresh',
           ),
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              context.go('/profile');
+            },
+            tooltip: 'Profile',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               AppAuth.instance.logout();

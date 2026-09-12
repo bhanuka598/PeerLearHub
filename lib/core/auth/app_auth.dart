@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:peer_learn_hub/core/auth/auth_service.dart';
 
-enum AppUserRole { student, teacher, admin }
+enum AppUserRole { student, teacher, moderator, admin }
 
-class AppAuth {
+class AppAuth extends ChangeNotifier {
   AppAuth._();
 
   static final AppAuth instance = AppAuth._();
@@ -13,42 +14,70 @@ class AppAuth {
 
   void setRole(AppUserRole role) {
     _currentRole = role;
+    notifyListeners();
+  }
+
+  void switchRole(AppUserRole role) {
+    _currentRole = role;
+    notifyListeners();
   }
 
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      final role = AuthService.instance.authenticatedRole;
-      if (role != null) {
-        setRole(_roleFromName(role));
+      // Fetch user role from backend
+      try {
+        final loginData = await AuthService.instance.loginWithRole();
+        final roleString = loginData['user']['role'] as String?;
+        
+        switch (roleString) {
+          case 'moderator':
+            setRole(AppUserRole.moderator);
+            break;
+          case 'teacher':
+            setRole(AppUserRole.teacher);
+            break;
+          case 'admin':
+            setRole(AppUserRole.admin);
+            break;
+          default:
+            setRole(AppUserRole.student);
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch user role: $e');
+        setRole(AppUserRole.student);
       }
     }
     return signedIn;
   }
 
-  Future<bool> saveGoogleRole(AppUserRole role) async {
+  Future<bool> registerAsModerator({required String adminKey}) async {
     try {
-      final savedRole = await AuthService.instance.saveRole(role.name);
-      if (savedRole == null) {
-        return false;
+      final userData = await AuthService.instance.registerAsModerator(
+        adminKey: adminKey,
+      );
+      
+      // Update role based on response
+      final roleString = userData['role'] as String?;
+      switch (roleString) {
+        case 'moderator':
+          setRole(AppUserRole.moderator);
+          break;
+        default:
+          setRole(AppUserRole.student);
       }
-      setRole(_roleFromName(savedRole));
+      
       return true;
-    } on Exception {
+    } catch (e) {
+      debugPrint('Failed to register as moderator: $e');
       return false;
     }
   }
 
-  AppUserRole _roleFromName(String role) {
-    return switch (role) {
-      'teacher' => AppUserRole.teacher,
-      'admin' => AppUserRole.admin,
-      _ => AppUserRole.student,
-    };
-  }
-
   void logout() {
     _currentRole = null;
+    AuthService.instance.signOut();
+    notifyListeners();
   }
 
   String getHomeRoute() {
@@ -57,6 +86,8 @@ class AppAuth {
         return '/learning';
       case AppUserRole.teacher:
         return '/skill-provider';
+      case AppUserRole.moderator:
+        return '/moderation';
       case AppUserRole.admin:
         return '/moderation';
       case null:
@@ -71,9 +102,9 @@ class AppAuth {
       '/loading',
       '/login',
       '/register',
+      '/moderation/register',
       '/forgot-password',
       '/otp-verification',
-      '/select-role',
     ];
     if (allowedForGuest.contains(cleanLocation)) {
       return true;
@@ -85,13 +116,27 @@ class AppAuth {
             cleanLocation == '/learning/my-courses' ||
             cleanLocation == '/learning/course' ||
             cleanLocation == '/learning/lesson' ||
-            cleanLocation == '/skill-exchange';
-      case AppUserRole.teacher:
-        return cleanLocation == '/skill-exchange' ||
+            cleanLocation == '/learning/quiz' ||
+            cleanLocation == '/learning/assignment' ||
+            cleanLocation == '/skill-exchange' ||
             cleanLocation == '/skill-provider' ||
             cleanLocation == '/skill-provider/my-lessons' ||
             cleanLocation == '/skill-provider/create' ||
             cleanLocation == '/skill-provider/edit';
+      case AppUserRole.teacher:
+        return cleanLocation == '/learning' ||
+            cleanLocation == '/learning/my-courses' ||
+            cleanLocation == '/learning/course' ||
+            cleanLocation == '/learning/lesson' ||
+            cleanLocation == '/learning/quiz' ||
+            cleanLocation == '/learning/assignment' ||
+            cleanLocation == '/skill-exchange' ||
+            cleanLocation == '/skill-provider' ||
+            cleanLocation == '/skill-provider/my-lessons' ||
+            cleanLocation == '/skill-provider/create' ||
+            cleanLocation == '/skill-provider/edit';
+      case AppUserRole.moderator:
+        return cleanLocation == '/moderation';
       case AppUserRole.admin:
         return cleanLocation == '/moderation';
       case null:

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -18,14 +19,22 @@ class AuthService {
   static const String _googleServerClientId =
       '536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com';
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: _googleServerClientId,
-  );
+  final GoogleSignIn _googleSignIn = kIsWeb
+      ? GoogleSignIn(clientId: _googleServerClientId)
+      : GoogleSignIn(serverClientId: _googleServerClientId);
   String? _lastError;
-  String? _authenticatedRole;
 
   String? get lastError => _lastError;
-  String? get authenticatedRole => _authenticatedRole;
+
+  FirebaseAuth get _requiredFirebaseAuth {
+    final firebaseAuth = _firebaseAuth;
+    if (firebaseAuth == null) {
+      throw StateError(
+        'Firebase Auth is not initialized. Check the Firebase configuration.',
+      );
+    }
+    return firebaseAuth;
+  }
 
   FirebaseAuth? get _firebaseAuth {
     try {
@@ -52,6 +61,134 @@ class AuthService {
     return _defaultBackendUrl;
   }
 
+  Future<UserCredential> registerWithEmail({
+    required String fullName,
+    required String email,
+    required String password,
+    required String learningGoal,
+  }) async {
+    _lastError = null;
+    final credential = await _requiredFirebaseAuth
+        .createUserWithEmailAndPassword(
+          email: email.trim().toLowerCase(),
+          password: password,
+        );
+    final user = credential.user;
+    if (user == null) {
+      throw StateError('Firebase did not return the newly created user.');
+    }
+
+    await user.updateDisplayName(fullName.trim());
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'fullName': fullName.trim(),
+        'email': user.email,
+        'learningGoal': learningGoal,
+        'role': 'student',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') {
+        rethrow;
+      }
+      debugPrint('User profile was not saved: Firestore permissions denied.');
+    }
+    return credential;
+  }
+
+  Future<UserCredential> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    _lastError = null;
+    final credential = await _requiredFirebaseAuth.signInWithEmailAndPassword(
+      email: email.trim().toLowerCase(),
+      password: password,
+    );
+    final user = credential.user;
+    if (user != null) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email,
+          'lastLoginAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } on FirebaseException catch (error) {
+        if (error.code != 'permission-denied') {
+          rethrow;
+        }
+        debugPrint(
+          'Login succeeded, but the profile timestamp was not saved: '
+          'Firestore permissions denied.',
+        );
+      }
+    }
+    return credential;
+  }
+
+  Future<void> signOut() async {
+    await _firebaseAuth?.signOut();
+    await _googleSignIn.signOut();
+  }
+
+  Future<void> requestPasswordResetCode(String email) async {
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/password-reset/request'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(
+        payload['message'] ?? 'Unable to send verification code.',
+      );
+    }
+  }
+
+  Future<void> verifyPasswordResetCode({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/password-reset/verify'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email.trim().toLowerCase(),
+        'otp': otp,
+        'newPassword': newPassword,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Unable to reset password.');
+    }
+  }
+
+  String authErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'An account already exists for this email address.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'weak-password':
+        return 'Choose a stronger password with at least 6 characters.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Incorrect email or password.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      default:
+        return error.message ?? 'Authentication failed. Please try again.';
+    }
+  }
+
   Future<Map<String, dynamic>> verifyTokenWithBackend(String idToken) async {
     final response = await http.post(
       Uri.parse('$backendBaseUrl/api/auth/verify-token'),
@@ -68,35 +205,8 @@ class AuthService {
     return Map<String, dynamic>.from(payload['user'] as Map);
   }
 
-  Future<String?> saveRole(String role) async {
-    final firebaseAuth = _firebaseAuth;
-    final token = await firebaseAuth?.currentUser?.getIdToken(true);
-    if (firebaseAuth == null || token == null) {
-      _lastError = 'Firebase authentication is not available.';
-      return null;
-    }
-
-    final response = await http.post(
-      Uri.parse('$backendBaseUrl/api/auth/role'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'role': role}),
-    );
-    final payload = jsonDecode(response.body);
-    if ((response.statusCode != 200 && response.statusCode != 201) ||
-        payload['success'] != true) {
-      throw Exception(payload['message'] ?? 'Unable to save account role.');
-    }
-
-    _authenticatedRole = payload['role'] as String?;
-    return _authenticatedRole;
-  }
-
   Future<bool> signInWithGoogle() async {
     _lastError = null;
-    _authenticatedRole = null;
     try {
       final firebaseAuth = _firebaseAuth;
       if (firebaseAuth == null) {
@@ -134,8 +244,7 @@ class AuthService {
       }
 
       try {
-        final backendUser = await verifyTokenWithBackend(firebaseIdToken);
-        _authenticatedRole = backendUser['role'] as String?;
+        await verifyTokenWithBackend(firebaseIdToken);
       } on Exception catch (error) {
         await firebaseAuth.signOut();
         _lastError =
@@ -165,5 +274,90 @@ class AuthService {
       debugPrint('Google sign-in failed: $error');
       return false;
     }
+  }
+
+  Future<bool> isModerator() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (!userDoc.exists) {
+        return false;
+      }
+
+      final userData = userDoc.data();
+      if (userData == null) {
+        return false;
+      }
+
+      return userData['role'] == 'moderator';
+    } catch (e) {
+      debugPrint('Error checking moderator status: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> registerAsModerator({
+    required String adminKey,
+  }) async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in to register as moderator.');
+    }
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/register-moderator'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'adminKey': adminKey,
+      }),
+    );
+
+    final payload = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Failed to register as moderator.');
+    }
+
+    return Map<String, dynamic>.from(payload['user'] as Map);
+  }
+
+  Future<Map<String, dynamic>> loginWithRole() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw Exception('User must be logged in.');
+    }
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('Failed to get Firebase ID token.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$backendBaseUrl/api/auth/login-with-role'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+
+    final payload = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || payload['success'] != true) {
+      throw Exception(payload['message'] ?? 'Login failed.');
+    }
+
+    return Map<String, dynamic>.from(payload as Map);
   }
 }
