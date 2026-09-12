@@ -53,6 +53,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Approve Verification'),
         content: const Text(
           'Are you sure you want to approve this verification request?',
@@ -65,7 +66,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
+              backgroundColor: Colors.green,
             ),
             child: const Text('Approve'),
           ),
@@ -78,7 +79,6 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // Mock moderator ID - will be replaced with actual auth user
       await _verificationService.approveVerificationRequest(
         widget.requestId,
         'mod_001',
@@ -88,7 +88,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Verification approved successfully'),
-            backgroundColor: AppColors.success,
+            backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context, true);
@@ -114,7 +114,6 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // Mock moderator ID - will be replaced with actual auth user
       await _verificationService.rejectVerificationRequest(
         widget.requestId,
         'mod_001',
@@ -125,7 +124,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Verification rejected'),
-            backgroundColor: AppColors.error,
+            backgroundColor: Colors.red,
           ),
         );
         Navigator.pop(context, true);
@@ -140,13 +139,38 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     }
   }
 
+  Color _getStatusColor() {
+    switch (_request!.status) {
+      case VerificationStatus.pending:
+        return Colors.orange;
+      case VerificationStatus.approved:
+        return Colors.green;
+      case VerificationStatus.rejected:
+        return Colors.red;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+    final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        title: const Text('Verification Details'),
+        backgroundColor: const Color(0xFFF5F7FB),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Verification Review',
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -157,42 +181,250 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // User Information Card
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 32,
-                                backgroundColor: AppColors.primaryLight,
-                                child: Text(
-                                  _request!.userName[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    color: AppColors.primaryTeal,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryTeal.withOpacity(0.2),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 32,
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              backgroundImage: const AssetImage(
+                                'assets/images/profile_hero.png',
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _request!.userName,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
                                   ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.14),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      _request!.status.displayName,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Verification details',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildInfoRow(
+                              Icons.verified_user_outlined,
+                              'Type',
+                              _request!.verificationType.displayName,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow(
+                              Icons.calendar_today_outlined,
+                              'Submitted',
+                              dateFormat.format(_request!.submittedAt),
+                            ),
+                            if (_request!.verificationType == VerificationType.skill) ...[
+                              const SizedBox(height: 12),
+                              _buildInfoRow(
+                                Icons.school_outlined,
+                                'Skill',
+                                _request!.skillName ?? 'Not specified',
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      if (_request!.verificationType == VerificationType.skill &&
+                          _request!.experienceDescription != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Experience',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black87,
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(height: 12),
+                              Text(
+                                _request!.experienceDescription!,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      if (_request!.portfolioUrl != null ||
+                          (_request!.evidenceUrls != null &&
+                              _request!.evidenceUrls!.isNotEmpty)) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Evidence',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (_request!.portfolioUrl != null)
+                                _buildLinkItem(
+                                  Icons.link,
+                                  'Portfolio',
+                                  _request!.portfolioUrl!,
+                                ),
+                              if (_request!.evidenceUrls != null)
+                                ..._request!.evidenceUrls!.map(
+                                  (url) => Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: _buildLinkItem(
+                                      Icons.attachment,
+                                      'Attachment',
+                                      url,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      if (_request!.status == VerificationStatus.rejected &&
+                          _request!.rejectionReason != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.red[700],
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _request!.userName,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                      'Rejection reason',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.red[700],
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'User ID: ${_request!.userId}',
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      _request!.rejectionReason!,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.red[900],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -200,296 +432,53 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Verification Type & Status
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDetailRow(
-                                'Verification Type',
-                                _request!.verificationType.displayName,
-                                Icons.verified_outlined,
-                              ),
-                              const Divider(height: 24),
-                              _buildDetailRow(
-                                'Status',
-                                _request!.status.displayName,
-                                Icons.info_outline,
-                                valueColor: _getStatusColor(),
-                              ),
-                              const Divider(height: 24),
-                              _buildDetailRow(
-                                'Submitted',
-                                dateFormat.format(_request!.submittedAt),
-                                Icons.calendar_today,
-                              ),
-                              if (_request!.reviewedAt != null) ...[
-                                const Divider(height: 24),
-                                _buildDetailRow(
-                                  'Reviewed',
-                                  dateFormat.format(_request!.reviewedAt!),
-                                  Icons.check_circle_outline,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Identity Verification Details
-                      if (_request!.verificationType ==
-                          VerificationType.identity) ...[
-                        Text(
-                          'Identity Information',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDetailRow(
-                                  'Full Name',
-                                  _request!.fullName ?? 'Not provided',
-                                  Icons.person,
-                                ),
-                                const Divider(height: 24),
-                                const Text(
-                                  'Identity Document',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                if (_request!.identityDocumentUrl != null)
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.background,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: AppColors.border),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        const Icon(
-                                          Icons.image_outlined,
-                                          size: 48,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Document Available',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _request!.identityDocumentUrl!,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: AppColors.primaryTeal,
-                                              ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                else
-                                  const Text(
-                                    'No document provided',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      // Skill Verification Details
-                      if (_request!.verificationType ==
-                          VerificationType.skill) ...[
-                        Text(
-                          'Skill Information',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDetailRow(
-                                  'Skill Name',
-                                  _request!.skillName ?? 'Not specified',
-                                  Icons.stars,
-                                ),
-                                const Divider(height: 24),
-                                const Text(
-                                  'Experience Description',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _request!.experienceDescription ??
-                                      'No description provided',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                if (_request!.portfolioUrl != null) ...[
-                                  const Divider(height: 24),
-                                  _buildDetailRow(
-                                    'Portfolio URL',
-                                    _request!.portfolioUrl!,
-                                    Icons.link,
-                                    valueColor: AppColors.primaryTeal,
-                                  ),
-                                ],
-                                if (_request!.evidenceUrls != null &&
-                                    _request!.evidenceUrls!.isNotEmpty) ...[
-                                  const Divider(height: 24),
-                                  const Text(
-                                    'Evidence Files',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ..._request!.evidenceUrls!.map(
-                                    (url) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.background,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border:
-                                              Border.all(color: AppColors.border),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.attachment,
-                                              size: 20,
-                                              color: AppColors.primaryTeal,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                url,
-                                                style: const TextStyle(
-                                                  color: AppColors.primaryTeal,
-                                                  fontSize: 13,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      // Rejection Reason (if rejected)
-                      if (_request!.status == VerificationStatus.rejected &&
-                          _request!.rejectionReason != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          'Rejection Reason',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Card(
-                          color: AppColors.error.withOpacity(0.05),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.info_outline,
-                                  color: AppColors.error,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _request!.rejectionReason!,
-                                    style: const TextStyle(
-                                      color: AppColors.error,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                       ],
 
                       const SizedBox(height: 24),
 
-                      // Action Buttons
                       if (_request!.status == VerificationStatus.pending &&
                           !_isProcessing)
                         Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton.icon(
+                              child: OutlinedButton(
                                 onPressed: _rejectRequest,
-                                icon: const Icon(Icons.close),
-                                label: const Text('Reject'),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.error,
-                                  side: const BorderSide(color: AppColors.error),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  foregroundColor: Colors.red,
+                                  side: const BorderSide(color: Colors.red, width: 2),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Reject',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: ElevatedButton.icon(
+                              child: ElevatedButton(
                                 onPressed: _approveRequest,
-                                icon: const Icon(Icons.check),
-                                label: const Text('Approve'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.success,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Approve',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
@@ -511,19 +500,20 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     );
   }
 
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    IconData icon, {
-    Color? valueColor,
-  }) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: AppColors.primaryTeal,
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: AppColors.primaryTeal,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -532,18 +522,19 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 value,
-                style: TextStyle(
-                  color: valueColor ?? AppColors.textPrimary,
+                style: const TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -553,15 +544,44 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     );
   }
 
-  Color _getStatusColor() {
-    switch (_request!.status) {
-      case VerificationStatus.pending:
-        return AppColors.pending;
-      case VerificationStatus.approved:
-        return AppColors.approved;
-      case VerificationStatus.rejected:
-        return AppColors.rejected;
-    }
+  Widget _buildLinkItem(IconData icon, String label, String url) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primaryTeal),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                Text(
+                  url,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.primaryTeal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -594,6 +614,7 @@ class _RejectionDialogState extends State<_RejectionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Reject Verification'),
       content: SingleChildScrollView(
         child: Column(
@@ -614,16 +635,21 @@ class _RejectionDialogState extends State<_RejectionDialog> {
                 },
                 contentPadding: EdgeInsets.zero,
                 dense: true,
+                activeColor: AppColors.primaryTeal,
               ),
             ),
             if (_selectedReason == 'Other') ...[
               const SizedBox(height: 12),
               TextField(
                 controller: _customReasonController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Custom Reason',
                   hintText: 'Enter reason for rejection',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
                 ),
                 maxLines: 3,
               ),
@@ -654,7 +680,7 @@ class _RejectionDialogState extends State<_RejectionDialog> {
             Navigator.pop(context, reason);
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.error,
+            backgroundColor: Colors.red,
           ),
           child: const Text('Reject'),
         ),

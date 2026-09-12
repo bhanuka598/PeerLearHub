@@ -74,38 +74,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/branding/peerlearnhub-icon.png
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  remove_alpha_ios: true
-  image_path: assets/branding/peerlearnhub-icon.png
-  min_sdk_android: 21
-  adaptive_icon_background: "#00B4A6"
-  adaptive_icon_foreground: assets/branding/peerlearnhub-icon.png
-  web:
-    generate: true
-    image_path: assets/branding/peerlearnhub-icon.png
-    background_color: "#00B4A6"
-    theme_color: "#008F83"
-  windows:
-    generate: true
-    image_path: assets/branding/peerlearnhub-icon.png
-    icon_size: 48
-  macos:
-    generate: true
-    image_path: assets/branding/peerlearnhub-icon.png
-
-flutter_native_splash:
-  color: "#00B4A6"
-  image: assets/branding/peerlearnhub-icon.png
-  android_12:
-    color: "#00B4A6"
-    image: assets/branding/peerlearnhub-icon.png
-  android: true
-  ios: true
-  web: true
+    - assets/images/moderation_hero.png
+    - assets/images/safety_hero.png
+    - assets/images/profile_hero.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

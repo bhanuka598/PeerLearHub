@@ -50,7 +50,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   Future<void> _updateStatus(ReportStatus newStatus) async {
     String? resolutionNote;
     
-    // For resolved/dismissed, optionally ask for note
     if (newStatus == ReportStatus.resolved || newStatus == ReportStatus.dismissed) {
       resolutionNote = await showDialog<String>(
         context: context,
@@ -59,14 +58,12 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         ),
       );
       
-      // If dialog was cancelled, don't proceed
       if (resolutionNote == null) return;
     }
 
     setState(() => _isProcessing = true);
 
     try {
-      // Mock moderator ID - will be replaced with actual auth user
       await _moderationService.updateReportStatus(
         widget.reportId,
         newStatus,
@@ -78,7 +75,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Report status updated to ${newStatus.displayName}'),
-            backgroundColor: AppColors.success,
+            backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context, true);
@@ -96,34 +93,48 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   Color _getStatusColor() {
     switch (_report!.status) {
       case ReportStatus.open:
-        return AppColors.error;
+        return Colors.red;
       case ReportStatus.underReview:
-        return AppColors.pending;
+        return Colors.orange;
       case ReportStatus.resolved:
-        return AppColors.success;
+        return Colors.green;
       case ReportStatus.dismissed:
-        return AppColors.textSecondary;
+        return Colors.grey;
     }
   }
 
   Color _getSeverityColor() {
     switch (_report!.severity) {
       case ReportSeverity.low:
-        return AppColors.severityLow;
+        return Colors.blue;
       case ReportSeverity.medium:
-        return AppColors.severityMedium;
+        return Colors.orange;
       case ReportSeverity.high:
-        return AppColors.severityHigh;
+        return Colors.red;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+    final dateFormat = DateFormat('MMM dd, yyyy · hh:mm a');
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        title: const Text('Report Details'),
+        backgroundColor: const Color(0xFFF5F7FB),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Report Details',
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -134,298 +145,335 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Status and Severity Card
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F766E), Color(0xFF2DD4BF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryTeal.withOpacity(0.2),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.white.withOpacity(0.18),
+                              backgroundImage: const AssetImage(
+                                'assets/images/profile_hero.png',
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _report!.reason.displayName,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.14),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          _report!.status.displayName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.14),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          _report!.severity.displayName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Report information',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildInfoRow(
+                              Icons.flag_outlined,
+                              'Reason',
+                              _report!.reason.displayName,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow(
+                              Icons.calendar_today_outlined,
+                              'Reported',
+                              dateFormat.format(_report!.createdAt),
+                            ),
+                            if (_report!.reviewedAt != null) ...[
+                              const SizedBox(height: 12),
+                              _buildInfoRow(
+                                Icons.check_circle_outline,
+                                'Reviewed',
+                                dateFormat.format(_report!.reviewedAt!),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Users involved',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildInfoRow(
+                              Icons.person_off_outlined,
+                              'Reported user',
+                              _report!.reportedUserName ?? 'Unknown',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow(
+                              Icons.person_outlined,
+                              'Reporter',
+                              _report!.reporterName ?? 'Anonymous',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Description',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _report!.description,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.grey[700],
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      if (_report!.resolutionNote != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green[200]!),
+                          ),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Status',
-                                          style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _getStatusColor().withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: _getStatusColor(),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _report!.status.displayName,
-                                            style: TextStyle(
-                                              color: _getStatusColor(),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  Icon(
+                                    Icons.note_outlined,
+                                    color: Colors.green[700],
+                                    size: 24,
                                   ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Severity',
-                                          style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _getSeverityColor().withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: _getSeverityColor(),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _report!.severity.displayName,
-                                            style: TextStyle(
-                                              color: _getSeverityColor(),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Resolution note',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.green[700],
                                     ),
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _report!.resolutionNote!,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.green[900],
+                                ),
+                              ),
                             ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Report Information
-                      Text(
-                        'Report Information',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDetailRow(
-                                'Report ID',
-                                _report!.id,
-                                Icons.tag,
-                              ),
-                              const Divider(height: 24),
-                              _buildDetailRow(
-                                'Reason',
-                                _report!.reason.displayName,
-                                Icons.report_outlined,
-                              ),
-                              const Divider(height: 24),
-                              _buildDetailRow(
-                                'Reported',
-                                dateFormat.format(_report!.createdAt),
-                                Icons.calendar_today,
-                              ),
-                              if (_report!.reviewedAt != null) ...[
-                                const Divider(height: 24),
-                                _buildDetailRow(
-                                  'Reviewed',
-                                  dateFormat.format(_report!.reviewedAt!),
-                                  Icons.check_circle_outline,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Users Involved
-                      Text(
-                        'Users Involved',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDetailRow(
-                                'Reported User',
-                                _report!.reportedUserName ?? 'Unknown',
-                                Icons.person_outlined,
-                              ),
-                              const SizedBox(height: 4),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 32),
-                                child: Text(
-                                  'ID: ${_report!.reportedUserId}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                              const Divider(height: 24),
-                              _buildDetailRow(
-                                'Reported By',
-                                _report!.reporterName ?? 'Anonymous',
-                                Icons.person,
-                              ),
-                              if (_report!.relatedContentId != null) ...[
-                                const Divider(height: 24),
-                                _buildDetailRow(
-                                  'Related Content',
-                                  _report!.relatedContentId!,
-                                  Icons.content_copy,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Description
-                      Text(
-                        'Description',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            _report!.description,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                      ),
-
-                      // Resolution Note (if exists)
-                      if (_report!.resolutionNote != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          'Resolution Note',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Card(
-                          color: AppColors.success.withOpacity(0.05),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.note_outlined,
-                                  color: AppColors.success,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _report!.resolutionNote!,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       ],
 
                       const SizedBox(height: 24),
 
-                      // Action Buttons
                       if (_report!.status != ReportStatus.resolved &&
                           _report!.status != ReportStatus.dismissed &&
                           !_isProcessing) ...[
-                        Text(
-                          'Moderation Actions',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 12),
-                        
                         if (_report!.status == ReportStatus.open)
                           SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton.icon(
+                            child: ElevatedButton(
                               onPressed: () => _updateStatus(ReportStatus.underReview),
-                              icon: const Icon(Icons.pending_actions),
-                              label: const Text('Mark as Under Review'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.pending,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                'Mark as Under Review',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
-                        
                         const SizedBox(height: 12),
-                        
                         Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton.icon(
+                              child: OutlinedButton(
                                 onPressed: () => _updateStatus(ReportStatus.dismissed),
-                                icon: const Icon(Icons.block),
-                                label: const Text('Dismiss'),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.textSecondary,
-                                  side: const BorderSide(
-                                    color: AppColors.textSecondary,
+                                  foregroundColor: Colors.grey[700],
+                                  side: BorderSide(color: Colors.grey[400]!, width: 2),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                child: const Text(
+                                  'Dismiss',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: ElevatedButton.icon(
+                              child: ElevatedButton(
                                 onPressed: () => _updateStatus(ReportStatus.resolved),
-                                icon: const Icon(Icons.check_circle),
-                                label: const Text('Resolve'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.success,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Resolve',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
@@ -448,14 +496,20 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: AppColors.primaryTeal,
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: AppColors.primaryTeal,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -464,18 +518,19 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 value,
                 style: const TextStyle(
-                  color: AppColors.textPrimary,
                   fontSize: 15,
-                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -512,6 +567,7 @@ class _ResolutionNoteDialogState extends State<_ResolutionNoteDialog> {
     final isResolved = widget.status == ReportStatus.resolved;
     
     return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text('${isResolved ? 'Resolve' : 'Dismiss'} Report'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -527,7 +583,11 @@ class _ResolutionNoteDialogState extends State<_ResolutionNoteDialog> {
               hintText: isResolved
                   ? 'e.g., Content removed and user warned'
                   : 'e.g., No policy violation found',
-              border: const OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: Colors.grey[50],
             ),
             maxLines: 3,
           ),
@@ -544,7 +604,7 @@ class _ResolutionNoteDialogState extends State<_ResolutionNoteDialog> {
             Navigator.pop(context, note.isEmpty ? '' : note);
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: isResolved ? AppColors.success : AppColors.textSecondary,
+            backgroundColor: isResolved ? Colors.green : Colors.grey[700],
           ),
           child: Text(isResolved ? 'Resolve' : 'Dismiss'),
         ),

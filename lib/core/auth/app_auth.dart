@@ -36,6 +36,35 @@ class AppAuth extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRoleFromApi(String? roleString) {
+    switch (roleString) {
+      case 'moderator':
+        setRole(AppUserRole.moderator);
+        break;
+      case 'teacher':
+        setRole(AppUserRole.teacher);
+        break;
+      case 'admin':
+        setRole(AppUserRole.admin);
+        break;
+      default:
+        setRole(AppUserRole.student);
+    }
+  }
+
+  String getHomeRouteForRole(String? roleString) {
+    switch (roleString) {
+      case 'moderator':
+        return '/moderation';
+      case 'teacher':
+        return '/skill-provider';
+      case 'admin':
+        return '/moderation';
+      default:
+        return '/learning';
+    }
+  }
+
   void switchRole(AppUserRole role) {
     _currentRole = role;
     notifyListeners();
@@ -44,27 +73,14 @@ class AppAuth extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      // Fetch user role from backend — do not hardcode student
+      // Prefer the backend role when available, but fall back to the saved Firestore role.
       try {
         final loginData = await AuthService.instance.loginWithRole();
         final roleString = loginData['user']['role'] as String?;
-
-        switch (roleString) {
-          case 'moderator':
-            setRole(AppUserRole.moderator);
-            break;
-          case 'teacher':
-            setRole(AppUserRole.teacher);
-            break;
-          case 'admin':
-            setRole(AppUserRole.admin);
-            break;
-          default:
-            setRole(AppUserRole.student);
-        }
+        setRoleFromApi(roleString);
       } catch (e) {
-        debugPrint('Failed to fetch user role: $e');
-        setRole(AppUserRole.student);
+        debugPrint('Failed to fetch user role from backend: $e');
+        setRoleFromApi(await AuthService.instance.getCurrentUserRole());
       }
     }
     return signedIn;
@@ -72,16 +88,13 @@ class AppAuth extends ChangeNotifier {
 
   Future<bool> registerAsModerator() async {
     try {
-      final userData = await AuthService.instance.registerAsModerator();
+      final userData = await AuthService.instance.registerAsModerator(
+        adminKey: adminKey,
+      );
 
+      // Update role based on response
       final roleString = userData['role'] as String?;
-      switch (roleString) {
-        case 'moderator':
-          setRole(AppUserRole.moderator);
-          break;
-        default:
-          setRole(AppUserRole.student);
-      }
+      setRoleFromApi(roleString);
 
       return true;
     } catch (e) {
