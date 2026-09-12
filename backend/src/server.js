@@ -16,44 +16,6 @@ const app = express();
 const port = Number(process.env.PORT || 4000);
 const otpStore = new Map();
 
-// Generate secure admin key if not provided (DEVELOPMENT ONLY)
-function generateSecureAdminKey() {
-  const length = 32;
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  let result = '';
-  const values = new Uint32Array(length);
-  crypto.randomFillSync(values);
-  for (let i = 0; i < length; i++) {
-    result += charset[values[i] % charset.length];
-  }
-  return result;
-}
-
-// Set admin key from environment variable (PRODUCTION) or generate one (DEVELOPMENT)
-const isProduction = process.env.NODE_ENV === 'production';
-const ADMIN_KEY = process.env.MODERATOR_ADMIN_KEY;
-
-// In production, admin key MUST be set via environment variable
-if (isProduction && !ADMIN_KEY) {
-  console.error('❌ CRITICAL: MODERATOR_ADMIN_KEY environment variable is required in production!');
-  console.error('❌ Please set it before starting the server:');
-  console.error('   export MODERATOR_ADMIN_KEY=your-secure-key');
-  console.error('   Or generate one using: npm run generate-admin-key');
-  process.exit(1);
-}
-
-// In development, generate key if not provided
-let generatedKey = null;
-if (!isProduction && !ADMIN_KEY) {
-  generatedKey = generateSecureAdminKey();
-  console.log('🔑 Generated Admin Key for Moderator Registration (Development Mode):');
-  console.log('   ' + generatedKey);
-  console.log('⚠️  This is for development only. In production, set MODERATOR_ADMIN_KEY environment variable.');
-}
-
-// Use the actual admin key (either from env or generated)
-const effectiveAdminKey = ADMIN_KEY || generatedKey;
-
 // Configure CORS to allow requests from Flutter web
 app.use(cors({
   origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'],
@@ -117,22 +79,6 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Get admin key (development only - remove in production)
-app.get('/api/admin/key', (_req, res) => {
-  if (isProduction) {
-    return res.status(403).json({
-      success: false,
-      message: 'Admin key retrieval is disabled in production.',
-    });
-  }
-  
-  res.json({
-    success: true,
-    adminKey: effectiveAdminKey,
-    note: 'This endpoint is for development only. Remove in production.',
-  });
-});
-
 app.post('/api/auth/verify-token', async (req, res) => {
   try {
     const { idToken } = req.body ?? {};
@@ -179,18 +125,9 @@ app.post('/api/auth/verify-token', async (req, res) => {
   }
 });
 
-// Moderator registration endpoint (requires admin key)
 app.post('/api/auth/register-moderator', async (req, res) => {
   try {
-    const { idToken, adminKey } = req.body ?? {};
-
-    // Verify admin key
-    if (adminKey !== effectiveAdminKey) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid admin key. Access denied.',
-      });
-    }
+    const { idToken } = req.body ?? {};
 
     if (!idToken || typeof idToken !== 'string') {
       return res.status(400).json({
@@ -543,11 +480,5 @@ app.use((req, res) => {
 
 app.listen(port, () => {
   console.log(`PeerLearnHub backend listening on http://localhost:${port}`);
-  console.log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
-  
-  if (isProduction) {
-    console.log('✅ Security: Admin key loaded from environment variable');
-  } else {
-    console.log('⚠️  Development Mode: Using generated admin key');
-  }
+  console.log(`Environment: ${process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 });
