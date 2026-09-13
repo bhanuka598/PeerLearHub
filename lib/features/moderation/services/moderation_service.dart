@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/moderation_report.dart';
 import 'activity_log_service.dart';
 
@@ -19,9 +20,7 @@ class ModerationService {
         .collection(_collection)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ModerationReport.fromFirestore(doc))
-            .toList());
+        .map((snapshot) => _parseReports(snapshot.docs));
   }
 
   // Get reports by status
@@ -37,9 +36,7 @@ class ModerationService {
         .where('status', isEqualTo: status.name)
         .snapshots()
         .map((snapshot) {
-          final reports = snapshot.docs
-              .map((doc) => ModerationReport.fromFirestore(doc))
-              .toList();
+          final reports = _parseReports(snapshot.docs);
           // Sort in Dart instead of Firestore to avoid index requirement
           reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return reports;
@@ -59,9 +56,7 @@ class ModerationService {
         .where('severity', isEqualTo: severity.name)
         .snapshots()
         .map((snapshot) {
-          final reports = snapshot.docs
-              .map((doc) => ModerationReport.fromFirestore(doc))
-              .toList();
+          final reports = _parseReports(snapshot.docs);
           // Sort in Dart instead of Firestore to avoid index requirement
           reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return reports;
@@ -80,7 +75,7 @@ class ModerationService {
     
     final doc = await FirebaseFirestore.instance.collection(_collection).doc(id).get();
     if (doc.exists) {
-      return ModerationReport.fromFirestore(doc);
+      return _tryParseReport(doc);
     }
     return null;
   }
@@ -157,18 +152,64 @@ class ModerationService {
     }
     
     final snapshot = await FirebaseFirestore.instance.collection(_collection).get();
-    final reports = snapshot.docs
-        .map((doc) => ModerationReport.fromFirestore(doc))
-        .toList();
-    
+    var open = 0;
+    var underReview = 0;
+    var resolved = 0;
+    var dismissed = 0;
+    var highSeverity = 0;
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      switch (_stringName(data['status'])) {
+        case 'open':
+          open++;
+          break;
+        case 'underReview':
+          underReview++;
+          break;
+        case 'resolved':
+          resolved++;
+          break;
+        case 'dismissed':
+          dismissed++;
+          break;
+      }
+      if (_stringName(data['severity']) == 'high') {
+        highSeverity++;
+      }
+    }
+
     return {
-      'open': reports.where((r) => r.status == ReportStatus.open).length,
-      'underReview': reports.where((r) => r.status == ReportStatus.underReview).length,
-      'resolved': reports.where((r) => r.status == ReportStatus.resolved).length,
-      'dismissed': reports.where((r) => r.status == ReportStatus.dismissed).length,
-      'highSeverity': reports.where((r) => r.severity == ReportSeverity.high).length,
-      'total': reports.length,
+      'open': open,
+      'underReview': underReview,
+      'resolved': resolved,
+      'dismissed': dismissed,
+      'highSeverity': highSeverity,
+      'total': snapshot.docs.length,
     };
+  }
+
+  List<ModerationReport> _parseReports(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs.map(_tryParseReport).whereType<ModerationReport>().toList();
+  }
+
+  ModerationReport? _tryParseReport(DocumentSnapshot doc) {
+    try {
+      return ModerationReport.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Skipping malformed report ${doc.id}: $e');
+      return null;
+    }
+  }
+
+  String _stringName(dynamic value) {
+    if (value is String) return value;
+    if (value is List && value.isNotEmpty) {
+      return value.first.toString();
+    }
+    return value?.toString() ?? '';
   }
 
   // Mock data for development

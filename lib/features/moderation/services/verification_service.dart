@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/verification_request.dart';
 import 'activity_log_service.dart';
 
@@ -17,11 +18,12 @@ class VerificationService {
     
     return FirebaseFirestore.instance
         .collection(_collection)
-        .orderBy('submittedAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => VerificationRequest.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+          final requests = _parseRequests(snapshot.docs);
+          requests.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+          return requests;
+        });
   }
 
   // Get verification requests by status
@@ -40,9 +42,7 @@ class VerificationService {
         .where('status', isEqualTo: status.name)
         .snapshots()
         .map((snapshot) {
-          final requests = snapshot.docs
-              .map((doc) => VerificationRequest.fromFirestore(doc))
-              .toList();
+          final requests = _parseRequests(snapshot.docs);
           // Sort in Dart instead of Firestore to avoid index requirement
           requests.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
           return requests;
@@ -61,7 +61,7 @@ class VerificationService {
     
     final doc = await FirebaseFirestore.instance.collection(_collection).doc(id).get();
     if (doc.exists) {
-      return VerificationRequest.fromFirestore(doc);
+      return _tryParseRequest(doc);
     }
     return null;
   }
@@ -155,16 +155,53 @@ class VerificationService {
     }
     
     final snapshot = await FirebaseFirestore.instance.collection(_collection).get();
-    final requests = snapshot.docs
-        .map((doc) => VerificationRequest.fromFirestore(doc))
-        .toList();
-    
+    var pending = 0;
+    var approved = 0;
+    var rejected = 0;
+
+    for (final doc in snapshot.docs) {
+      switch (_statusName(doc.data()['status'])) {
+        case 'pending':
+          pending++;
+          break;
+        case 'approved':
+          approved++;
+          break;
+        case 'rejected':
+          rejected++;
+          break;
+      }
+    }
+
     return {
-      'pending': requests.where((r) => r.status == VerificationStatus.pending).length,
-      'approved': requests.where((r) => r.status == VerificationStatus.approved).length,
-      'rejected': requests.where((r) => r.status == VerificationStatus.rejected).length,
-      'total': requests.length,
+      'pending': pending,
+      'approved': approved,
+      'rejected': rejected,
+      'total': snapshot.docs.length,
     };
+  }
+
+  List<VerificationRequest> _parseRequests(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs.map(_tryParseRequest).whereType<VerificationRequest>().toList();
+  }
+
+  VerificationRequest? _tryParseRequest(DocumentSnapshot doc) {
+    try {
+      return VerificationRequest.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Skipping malformed verification request ${doc.id}: $e');
+      return null;
+    }
+  }
+
+  String _statusName(dynamic value) {
+    if (value is String) return value;
+    if (value is List && value.isNotEmpty) {
+      return value.first.toString();
+    }
+    return value?.toString() ?? '';
   }
 
   // Mock data for development

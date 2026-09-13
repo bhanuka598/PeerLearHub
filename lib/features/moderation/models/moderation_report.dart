@@ -98,34 +98,64 @@ class ModerationReport {
 
   // Convert from Firestore document
   factory ModerationReport.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return ModerationReport(
       id: doc.id,
-      reportedBy: data['reportedBy'] ?? '',
-      reporterName: data['reporterName'],
-      reportedUserId: data['reportedUserId'] ?? '',
-      reportedUserName: data['reportedUserName'],
-      relatedContentId: data['relatedContentId'],
+      reportedBy: _asString(data['reportedBy']),
+      reporterName: _asNullableString(data['reporterName']),
+      reportedUserId: _asString(data['reportedUserId']),
+      reportedUserName: _asNullableString(data['reportedUserName']),
+      relatedContentId: _asNullableString(data['relatedContentId']),
       reason: ReportReason.values.firstWhere(
-        (e) => e.name == data['reason'],
+        (e) => e.name == _asString(data['reason']),
         orElse: () => ReportReason.other,
       ),
-      description: data['description'] ?? '',
+      description: _asString(data['description']),
       severity: ReportSeverity.values.firstWhere(
-        (e) => e.name == data['severity'],
+        (e) => e.name == _asString(data['severity']),
         orElse: () => ReportSeverity.low,
       ),
       status: ReportStatus.values.firstWhere(
-        (e) => e.name == data['status'],
+        (e) => e.name == _asString(data['status']),
         orElse: () => ReportStatus.open,
       ),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      reviewedAt: data['reviewedAt'] != null
-          ? (data['reviewedAt'] as Timestamp).toDate()
-          : null,
-      reviewedBy: data['reviewedBy'],
-      resolutionNote: data['resolutionNote'],
+      createdAt: _asDateTime(data['createdAt']),
+      reviewedAt: _asNullableDateTime(data['reviewedAt']),
+      reviewedBy: _asNullableString(data['reviewedBy']),
+      resolutionNote: _asNullableString(data['resolutionNote']),
     );
+  }
+
+  static String _asString(dynamic value, [String fallback = '']) {
+    return _asNullableString(value) ?? fallback;
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : value;
+    }
+    if (value is List) {
+      for (final item in value) {
+        final parsed = _asNullableString(item);
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+    return value.toString();
+  }
+
+  static DateTime _asDateTime(dynamic value) {
+    return _asNullableDateTime(value) ?? DateTime.now();
+  }
+
+  static DateTime? _asNullableDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 
   // Convert to Firestore document
