@@ -4,8 +4,6 @@ import 'package:http/http.dart' as http;
 import '../../../core/auth/auth_service.dart';
 import '../models/skill_exchange_models.dart';
 
-//
-
 class AISuggestionService {
   // Environment-provided direct key if passed via flutter run --dart-define=GEMINI_API_KEY=...
   static const String _envGeminiApiKey = String.fromEnvironment(
