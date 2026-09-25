@@ -19,8 +19,8 @@ class CreateExchangeDialog extends StatefulWidget {
 }
 
 class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
-  ExchangeCourse? _offeredCourse;
-  ExchangeCourse? _targetCourse;
+  String? _offeredCourseId;
+  String? _targetCourseId;
   final TextEditingController _messageController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -32,8 +32,19 @@ class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
         .where((c) => c.ownerId != widget.provider.currentUser.id)
         .toList();
 
-    _offeredCourse = widget.preselectedOfferedCourse ?? (myCourses.isNotEmpty ? myCourses.first : null);
-    _targetCourse = widget.preselectedTargetCourse ?? (otherCourses.isNotEmpty ? otherCourses.first : null);
+    if (widget.preselectedOfferedCourse != null &&
+        myCourses.any((c) => c.id == widget.preselectedOfferedCourse!.id)) {
+      _offeredCourseId = widget.preselectedOfferedCourse!.id;
+    } else {
+      _offeredCourseId = myCourses.isNotEmpty ? myCourses.first.id : null;
+    }
+
+    if (widget.preselectedTargetCourse != null &&
+        otherCourses.any((c) => c.id == widget.preselectedTargetCourse!.id)) {
+      _targetCourseId = widget.preselectedTargetCourse!.id;
+    } else {
+      _targetCourseId = otherCourses.isNotEmpty ? otherCourses.first.id : null;
+    }
   }
 
   @override
@@ -43,7 +54,25 @@ class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
   }
 
   Future<void> _submitRequest() async {
-    if (_offeredCourse == null || _targetCourse == null) {
+    final myCourses = widget.provider.myCourses;
+    final otherCourses = widget.provider.availableCourses
+        .where((c) => c.ownerId != widget.provider.currentUser.id)
+        .toList();
+
+    final effectiveOfferedId = _offeredCourseId ?? (myCourses.isNotEmpty ? myCourses.first.id : null);
+    final effectiveTargetId = _targetCourseId ?? (otherCourses.isNotEmpty ? otherCourses.first.id : null);
+
+    ExchangeCourse? offered;
+    try {
+      offered = myCourses.firstWhere((c) => c.id == effectiveOfferedId);
+    } catch (_) {}
+
+    ExchangeCourse? target;
+    try {
+      target = otherCourses.firstWhere((c) => c.id == effectiveTargetId);
+    } catch (_) {}
+
+    if (offered == null || target == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select both your offered course and the requested course.')),
       );
@@ -53,8 +82,8 @@ class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
     setState(() => _isSubmitting = true);
 
     final success = await widget.provider.sendExchangeRequest(
-      offeredCourse: _offeredCourse!,
-      targetCourse: _targetCourse!,
+      offeredCourse: offered,
+      targetCourse: target,
       message: _messageController.text.trim().isEmpty
           ? 'Hi, I would love to exchange knowledge and collaborate!'
           : _messageController.text.trim(),
@@ -69,10 +98,17 @@ class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
             backgroundColor: const Color(0xFF0F766E),
             content: Text(
               widget.provider.currentUser.isLecturerOrTutor &&
-                      _targetCourse!.ownerRole != UserRole.student
+                      target.ownerRole != UserRole.student
                   ? 'Exchange request sent directly to peer tutor!'
                   : 'Exchange request submitted (awaiting tutor approval)!',
             ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text(widget.provider.errorMessage ?? 'Failed to send request. Check your connection.'),
           ),
         );
       }
@@ -85,8 +121,14 @@ class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
     final otherCourses = widget.provider.availableCourses
         .where((c) => c.ownerId != widget.provider.currentUser.id)
         .toList();
+
+    ExchangeCourse? target;
+    try {
+      target = otherCourses.firstWhere((c) => c.id == _targetCourseId);
+    } catch (_) {}
+
     final isDirectPeer = widget.provider.currentUser.isLecturerOrTutor &&
-        (_targetCourse?.ownerRole != UserRole.student);
+        (target?.ownerRole != UserRole.student);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -165,41 +207,44 @@ class _CreateExchangeDialogState extends State<CreateExchangeDialog> {
               if (myCourses.isEmpty)
                 const Text('No courses available to offer.', style: TextStyle(color: Colors.red))
               else
-                DropdownButtonFormField<ExchangeCourse>(
-                  initialValue: _offeredCourse,
+                DropdownButtonFormField<String>(
+                  initialValue: myCourses.any((c) => c.id == _offeredCourseId) ? _offeredCourseId : myCourses.first.id,
                   isExpanded: true,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                   items: myCourses.map((c) {
-                    return DropdownMenuItem(
-                      value: c,
+                    return DropdownMenuItem<String>(
+                      value: c.id,
                       child: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
                     );
                   }).toList(),
-                  onChanged: (val) => setState(() => _offeredCourse = val),
+                  onChanged: (val) => setState(() => _offeredCourseId = val),
                 ),
               const SizedBox(height: 14),
 
               // 2. Select Desired Target Course
               const Text('2. Course You Want In Exchange', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
-              DropdownButtonFormField<ExchangeCourse>(
-                initialValue: _targetCourse,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              if (otherCourses.isEmpty)
+                const Text('No courses available to request in exchange.', style: TextStyle(color: Colors.grey))
+              else
+                DropdownButtonFormField<String>(
+                  initialValue: otherCourses.any((c) => c.id == _targetCourseId) ? _targetCourseId : otherCourses.first.id,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: otherCourses.map((c) {
+                    return DropdownMenuItem<String>(
+                      value: c.id,
+                      child: Text('${c.title} (${c.ownerName})', maxLines: 1, overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => _targetCourseId = val),
                 ),
-                items: otherCourses.map((c) {
-                  return DropdownMenuItem(
-                    value: c,
-                    child: Text('${c.title} (${c.ownerName})', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => _targetCourse = val),
-              ),
               const SizedBox(height: 14),
 
               // Message

@@ -18,7 +18,7 @@ const otpStore = new Map();
 
 // Configure CORS to allow requests from Flutter web
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'],
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -467,6 +467,77 @@ app.post('/api/assignments/submit', async (req, res) => {
     return res.status(500).json({ 
       success: false, 
       message: error.message || 'Assignment submission failed.' 
+    });
+  }
+});
+
+// AI Skill Exchange Match Suggestions endpoint (uses GEMINI_API_KEY from .env)
+app.post('/api/ai/match-suggestions', async (req, res) => {
+  try {
+    const { prompt } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'GEMINI_API_KEY is not configured in backend .env',
+      });
+    }
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing prompt in request body.',
+      });
+    }
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 500,
+        },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini API returned error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({
+        success: false,
+        message: 'Gemini API call failed',
+      });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsedList = [];
+    try {
+      parsedList = JSON.parse(cleanJson);
+    } catch (parseErr) {
+      console.warn('Could not parse Gemini JSON response:', cleanJson);
+    }
+
+    return res.json({
+      success: true,
+      suggestions: parsedList,
+    });
+  } catch (error) {
+    console.error('Failed to generate AI match suggestions:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'AI suggestion generation failed.',
     });
   }
 });

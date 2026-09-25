@@ -28,13 +28,25 @@ class SkillExchangeProvider extends ChangeNotifier {
   ExchangeCourse? get selectedOfferedCourseForAI => _selectedOfferedCourseForAI;
 
   // Filtered requests
-  List<SkillExchangeRequest> get incomingRequests => _requests
-      .where((r) => r.targetOwnerId == currentUser.id)
-      .toList();
+  List<SkillExchangeRequest> get incomingRequests {
+    final activeIds = _repository.currentActiveUserIds;
+    return _requests
+        .where((r) => activeIds.contains(r.targetOwnerId) && !activeIds.contains(r.requesterId))
+        .toList();
+  }
 
-  List<SkillExchangeRequest> get outgoingRequests => _requests
-      .where((r) => r.requesterId == currentUser.id)
-      .toList();
+  List<SkillExchangeRequest> get outgoingRequests {
+    final activeIds = _repository.currentActiveUserIds;
+    final list = _requests
+        .where((r) => activeIds.contains(r.requesterId))
+        .toList();
+    // If list is empty but requests exist that were created by a student/current user
+    if (list.isEmpty && _requests.isNotEmpty) {
+      final nonIncoming = _requests.where((r) => !activeIds.contains(r.targetOwnerId)).toList();
+      if (nonIncoming.isNotEmpty) return nonIncoming;
+    }
+    return list;
+  }
 
   Future<void> loadInitialData() async {
     _isLoading = true;
