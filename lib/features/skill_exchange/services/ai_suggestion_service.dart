@@ -4,9 +4,13 @@ import 'package:http/http.dart' as http;
 import '../../../core/auth/auth_service.dart';
 import '../models/skill_exchange_models.dart';
 
+//
+
 class AISuggestionService {
   // Environment-provided direct key if passed via flutter run --dart-define=GEMINI_API_KEY=...
-  static const String _envGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
+  static const String _envGeminiApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+  );
 
   /// Hybrid AI Matching:
   /// 1. Algorithmic Candidate Filter & Scoring (Instant, multi-factor)
@@ -19,13 +23,15 @@ class AISuggestionService {
 
     for (final course in availableCourses) {
       // Don't compare with user's own courses
-      if (course.ownerId == myOfferedCourse.ownerId || course.id == myOfferedCourse.id) {
+      if (course.ownerId == myOfferedCourse.ownerId ||
+          course.id == myOfferedCourse.id) {
         continue;
       }
 
       final scoreDetails = _calculateMatchScore(myOfferedCourse, course);
       final double score = scoreDetails['score'] as double;
-      final List<String> matchingTags = scoreDetails['matchingTags'] as List<String>;
+      final List<String> matchingTags =
+          scoreDetails['matchingTags'] as List<String>;
       final String heuristicReasoning = scoreDetails['reasoning'] as String;
 
       if (score >= 40.0) {
@@ -67,7 +73,8 @@ class AISuggestionService {
     required ExchangeCourse offeredCourse,
     required List<AIMatchSuggestion> candidates,
   }) async {
-    final prompt = '''
+    final prompt =
+        '''
 You are an expert AI Learning & Skill Exchange Advisor for an education platform.
 Analyze an offered course and candidate peer courses to provide a concise, high-impact reasoning for why each exchange is beneficial.
 
@@ -94,7 +101,9 @@ Return ONLY raw JSON, with no markdown code fences or other text.
 
     // 1. Try secure backend endpoint (which reads GEMINI_API_KEY from backend/.env)
     try {
-      final backendUri = Uri.parse('${AuthService.backendBaseUrl}/api/ai/match-suggestions');
+      final backendUri = Uri.parse(
+        '${AuthService.backendBaseUrl}/api/ai/match-suggestions',
+      );
       final response = await http
           .post(
             backendUri,
@@ -105,7 +114,9 @@ Return ONLY raw JSON, with no markdown code fences or other text.
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data is Map && data['success'] == true && data['suggestions'] is List) {
+        if (data is Map &&
+            data['success'] == true &&
+            data['suggestions'] is List) {
           parsedList = data['suggestions'] as List<dynamic>;
         }
       }
@@ -126,9 +137,9 @@ Return ONLY raw JSON, with no markdown code fences or other text.
                 'contents': [
                   {
                     'parts': [
-                      {'text': prompt}
-                    ]
-                  }
+                      {'text': prompt},
+                    ],
+                  },
                 ],
                 'generationConfig': {
                   'temperature': 0.3,
@@ -140,8 +151,12 @@ Return ONLY raw JSON, with no markdown code fences or other text.
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          final rawText = data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
-          final cleanJson = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
+          final rawText =
+              data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
+          final cleanJson = rawText
+              .replaceAll('```json', '')
+              .replaceAll('```', '')
+              .trim();
           final parsed = jsonDecode(cleanJson);
           if (parsed is List) {
             parsedList = parsed;
@@ -202,7 +217,10 @@ Return ONLY raw JSON, with no markdown code fences or other text.
     }
 
     if (matchingTags.isNotEmpty) {
-      final tagMatchRatio = (matchingTags.length / (offered.tags.isEmpty ? 1 : offered.tags.length)).clamp(0.0, 1.0);
+      final tagMatchRatio =
+          (matchingTags.length /
+                  (offered.tags.isEmpty ? 1 : offered.tags.length))
+              .clamp(0.0, 1.0);
       final tagScore = tagMatchRatio * 45.0;
       score += tagScore;
       reasons.add('Shares key skills: ${matchingTags.join(', ')}');
@@ -214,10 +232,15 @@ Return ONLY raw JSON, with no markdown code fences or other text.
       reasons.add('Same discipline (${candidate.category})');
     } else {
       // Complementary pairings
-      final isComplementary = _areCategoriesComplementary(offered.category, candidate.category);
+      final isComplementary = _areCategoriesComplementary(
+        offered.category,
+        candidate.category,
+      );
       if (isComplementary) {
         score += 30.0;
-        reasons.add('High cross-domain synergy (${offered.category} ↔ ${candidate.category})');
+        reasons.add(
+          'High cross-domain synergy (${offered.category} ↔ ${candidate.category})',
+        );
       } else {
         score += 15.0;
         reasons.add('Broad learning expansion');
@@ -275,4 +298,3 @@ Return ONLY raw JSON, with no markdown code fences or other text.
     return false;
   }
 }
-
