@@ -22,28 +22,48 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Moderation Actions',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Filter Chips
+      backgroundColor: const Color(0xFFF8FAFB),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Row 1: Back arrow and Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Moderation Actions',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Filter Chips
           Container(
-            color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -60,15 +80,20 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
                           _selectedFilter = filter;
                         });
                       },
-                      backgroundColor: Colors.grey[100],
+                      backgroundColor: Colors.white,
                       selectedColor: AppColors.primaryTeal,
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
+                        color: isSelected ? Colors.white : Colors.grey[700],
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      side: BorderSide.none,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primaryTeal : Colors.grey[300]!,
+                        ),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -78,8 +103,19 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
 
           // Stats Row
           Container(
-            color: Colors.white,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -88,7 +124,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
                 Container(
                   width: 1,
                   height: 40,
-                  color: Colors.grey[300],
+                  color: Colors.grey[200],
                 ),
                 Expanded(
                   child: _buildStatItem('AVG RESPONSE', '2.4 Hours', Colors.orange),
@@ -166,6 +202,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -205,12 +242,12 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../widgets/moderator_bottom_nav.dart';
+import '../widgets/moderator_app_bar.dart';
 
 class ModeratorProfileScreen extends StatefulWidget {
   const ModeratorProfileScreen({super.key});
@@ -174,23 +175,9 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
     final photoUrl = _userData?['photoURL'] as String?;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF8FAFB),
       bottomNavigationBar: const ModeratorBottomNav(currentIndex: 4),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+      appBar: ModeratorAppBar(
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: Colors.black87),

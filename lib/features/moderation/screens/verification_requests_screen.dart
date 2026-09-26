@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../models/verification_request.dart';
 import '../services/verification_service.dart';
 import '../widgets/moderator_bottom_nav.dart';
+import '../widgets/moderator_app_bar.dart';
 import 'verification_details_screen.dart';
 
 class VerificationRequestsScreen extends StatefulWidget {
@@ -67,77 +68,96 @@ class _VerificationRequestsScreenState
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F7FB),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Verification Requests',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      backgroundColor: const Color(0xFFF8FAFB),
+      appBar: const ModeratorAppBar(),
       bottomNavigationBar: const ModeratorBottomNav(currentIndex: 1),
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryTeal.withOpacity(0.2),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
+            // Row 1: Back arrow and Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Review queue',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
                   ),
                 ],
               ),
+            ),
+            
+            // Row 2: Search bar and filter
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Verification queue',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Review profile and skill claims in one place.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            height: 1.4,
+                        ],
+                      ),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'What do you want to review?',
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
+                          prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Image.asset(
-                    'assets/images/moderation_hero.png',
-                    width: 90,
-                    height: 90,
-                    fit: BoxFit.contain,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryTeal.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.tune, color: Colors.white, size: 20),
+                      onPressed: () {
+                         // Filter bottom sheet or logic
+                      },
+                      padding: const EdgeInsets.all(14),
+                      constraints: const BoxConstraints(),
+                    ),
                   ),
                 ],
               ),
@@ -248,24 +268,13 @@ class _VerificationRequestsScreenState
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.white,
-                              statusColor.withOpacity(0.02),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: statusColor.withOpacity(0.2),
-                            width: 1.2,
-                          ),
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.04),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -282,48 +291,96 @@ class _VerificationRequestsScreenState
                                 ),
                               );
                             },
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 29,
-                                    backgroundColor: AppColors.primaryLight,
-                                    backgroundImage: const AssetImage(
-                                      'assets/images/profile_hero.png',
-                                    ),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: request.userProfileImage != null
+                                        ? Image.network(
+                                            request.userProfileImage!,
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Image.asset(
+                                            'assets/images/profile_hero.png',
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                          ),
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
+                                        Text(
+                                          request.userName,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          request.verificationType == VerificationType.skill
+                                              ? request.skillName ?? 'Skill verification'
+                                              : 'Identity verification',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
                                         Row(
                                           children: [
-                                            Expanded(
-                                              child: Text(
-                                                request.userName,
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Colors.black87,
-                                                ),
+                                            Icon(
+                                              Icons.star,
+                                              size: 16,
+                                              color: Colors.amber[600],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '5', // Keeping static as in reference
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.amber[600],
                                               ),
                                             ),
+                                            const SizedBox(width: 12),
+                                            Icon(
+                                              Icons.access_time_outlined,
+                                              size: 16,
+                                              color: Colors.grey[500],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              dateFormat.format(request.submittedAt),
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey[500],
+                                              ),
+                                            ),
+                                            const Spacer(),
                                             Container(
                                               padding: const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 5,
+                                                horizontal: 8,
+                                                vertical: 4,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: statusColor.withOpacity(0.12),
-                                                borderRadius: BorderRadius.circular(12),
+                                                color: statusColor.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(8),
                                               ),
                                               child: Text(
                                                 request.status.displayName,
                                                 style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: 10,
                                                   fontWeight: FontWeight.w700,
                                                   color: statusColor,
                                                 ),
@@ -331,38 +388,13 @@ class _VerificationRequestsScreenState
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          request.verificationType == VerificationType.skill
-                                              ? request.skillName ?? 'Skill verification'
-                                              : 'Identity verification',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey[700],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.calendar_today_outlined,
-                                              size: 13,
-                                              color: Colors.grey[500],
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              dateFormat.format(request.submittedAt),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[500],
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
                                       ],
                                     ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: Colors.grey[400],
                                   ),
                                 ],
                               ),

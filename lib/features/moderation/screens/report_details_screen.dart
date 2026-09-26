@@ -119,9 +119,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy · hh:mm a');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: const Color(0xFFF8FAFB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F7FB),
+        backgroundColor: const Color(0xFFF8FAFB),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),

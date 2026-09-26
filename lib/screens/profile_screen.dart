@@ -105,8 +105,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final textController3 = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
+      barrierDismissible: false,
+      builder: (context) {
+        bool isSubmitting = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
           return AlertDialog(
             title: const Text('Request Verification'),
             content: SingleChildScrollView(
@@ -158,32 +161,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context), 
+                child: const Text('Cancel')
+              ),
               FilledButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitting request...')));
-                  await VerificationService().submitVerificationRequest(
-                    userId: uid,
-                    userName: name,
-                    userProfileImage: photoUrl,
-                    verificationType: type,
-                    skillName: type == VerificationType.skill ? textController1.text : null,
-                    experienceDescription: type == VerificationType.skill ? textController2.text : null,
-                    portfolioUrl: type == VerificationType.skill && textController3.text.isNotEmpty ? textController3.text : null,
-                    fullName: type == VerificationType.identity ? textController1.text : null,
-                    identityDocumentUrl: type == VerificationType.identity ? textController2.text : null,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification requested successfully!')));
+                onPressed: isSubmitting ? null : () async {
+                  setState(() => isSubmitting = true);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+                  
+                  try {
+                    await VerificationService().submitVerificationRequest(
+                      userId: uid,
+                      userName: name,
+                      userProfileImage: photoUrl,
+                      verificationType: type,
+                      skillName: type == VerificationType.skill ? textController1.text : null,
+                      experienceDescription: type == VerificationType.skill ? textController2.text : null,
+                      portfolioUrl: type == VerificationType.skill && textController3.text.isNotEmpty ? textController3.text : null,
+                      fullName: type == VerificationType.identity ? textController1.text : null,
+                      identityDocumentUrl: type == VerificationType.identity ? textController2.text : null,
+                    );
+                    if (context.mounted) Navigator.pop(context);
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Verification requested successfully!'),
+                        backgroundColor: Colors.green,
+                      )
+                    );
+                  } catch (e) {
+                    setState(() => isSubmitting = false);
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to submit request: $e'),
+                        backgroundColor: Colors.red,
+                      )
+                    );
                   }
                 },
-                child: const Text('Submit'),
+                child: isSubmitting 
+                    ? const SizedBox(
+                        width: 20, height: 20, 
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                      )
+                    : const Text('Submit'),
               ),
             ],
           );
         }
-      ),
+        );
+      },
     );
   }
 

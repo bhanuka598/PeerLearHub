@@ -157,7 +157,7 @@ class VerificationService {
         actionType: 'verification_approved',
         targetId: requestId,
         targetUserId: request.userId,
-        description: 'Approved ${request.verificationType.displayName} verification for ${request.userName}',
+        description: 'Approved ${request.verificationType.displayName} for ${request.userName}',
         metadata: {
           'verificationType': request.verificationType.name,
           'skillName': request.skillName,
@@ -215,7 +215,7 @@ class VerificationService {
         actionType: 'verification_rejected',
         targetId: requestId,
         targetUserId: request.userId,
-        description: 'Rejected ${request.verificationType.displayName} verification for ${request.userName}',
+        description: 'Rejected ${request.verificationType.displayName} for ${request.userName}',
         metadata: {
           'verificationType': request.verificationType.name,
           'rejectionReason': rejectionReason,

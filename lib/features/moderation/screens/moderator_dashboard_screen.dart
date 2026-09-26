@@ -4,6 +4,7 @@ import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/navigation_card.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/stat_card.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/moderator_bottom_nav.dart';
+import 'package:peer_learn_hub/features/moderation/widgets/moderator_app_bar.dart';
 import '../../../core/constants/app_colors.dart';
 import '../services/verification_service.dart';
 import '../services/moderation_service.dart';
@@ -62,131 +63,80 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Moderator Dashboard'),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              AppAuth.instance.currentRole?.name.toUpperCase() ?? 'GUEST',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadStatistics,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              context.go('/profile');
-            },
-            tooltip: 'Profile',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              AppAuth.instance.logout();
-              context.go('/');
-            },
-            tooltip: 'Logout',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadStatistics,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Welcome Header
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF0F766E),
-                            const Color(0xFF14B8A6),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0F766E).withOpacity(0.28),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Welcome Back!',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Manage verifications and reports',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 92,
-                            height: 92,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
-                              color: Colors.white.withOpacity(0.12),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.25),
-                                width: 1,
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(16),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: Image.asset(
-                                'assets/images/moderation_hero.png',
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          ),
-                        ],
+      backgroundColor: const Color(0xFFF8FAFB),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.school, color: Colors.white, size: 24), // Placeholder logo
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Moderator Hub',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      AppAuth.instance.currentRole?.name.toUpperCase() ?? 'GUEST',
+                      style: const TextStyle(
+                        color: AppColors.primaryTeal,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    
-                    // Verification Statistics
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.black87),
+                    onPressed: _loadStatistics,
+                    tooltip: 'Refresh',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.black87),
+                    onPressed: () {
+                      AppAuth.instance.logout();
+                      context.go('/');
+                    },
+                    tooltip: 'Logout',
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _loadStatistics,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            // Verification Statistics
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
@@ -201,7 +151,7 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                       crossAxisCount: 2,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      childAspectRatio: 1.4,
+                      childAspectRatio: 1.05,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
                         StatCard(
@@ -247,7 +197,7 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                       crossAxisCount: 2,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      childAspectRatio: 1.4,
+                      childAspectRatio: 1.05,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
                         StatCard(
@@ -362,10 +312,13 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
+            ),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: ModeratorBottomNav(
         currentIndex: _selectedIndex,
