@@ -137,6 +137,40 @@ class ModerationService {
     }
   }
 
+  // Submit a new report (User action)
+  Future<void> submitReport({
+    required String reportedBy,
+    required String reportedUserId,
+    required ReportReason reason,
+    required String description,
+    required ReportSeverity severity,
+    String? reporterName,
+    String? reportedUserName,
+    String? relatedContentId,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return;
+    }
+    
+    final docRef = FirebaseFirestore.instance.collection(_collection).doc();
+    final report = ModerationReport(
+      id: docRef.id,
+      reportedBy: reportedBy,
+      reporterName: reporterName,
+      reportedUserId: reportedUserId,
+      reportedUserName: reportedUserName,
+      relatedContentId: relatedContentId,
+      reason: reason,
+      description: description,
+      severity: severity,
+      status: ReportStatus.open,
+      createdAt: DateTime.now(),
+    );
+    
+    await docRef.set(report.toFirestore());
+  }
+
   // Get statistics
   Future<Map<String, int>> getReportStatistics() async {
     if (useMockData) {

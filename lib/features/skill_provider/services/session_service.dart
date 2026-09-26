@@ -13,7 +13,7 @@ class SessionService extends ChangeNotifier {
   }
 
   static final SessionService instance = SessionService._();
-  static bool useMockData = true;
+  static bool useMockData = false;
 
   static const _collection = 'sessions';
   final List<ProviderSession> _sessions = [];

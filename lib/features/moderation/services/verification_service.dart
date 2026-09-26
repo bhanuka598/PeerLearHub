@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/verification_request.dart';
 import 'activity_log_service.dart';
+import '../../notifications/models/app_notification.dart';
+import '../../notifications/services/notification_service.dart';
 
 class VerificationService {
   // Flag to use mock data (set to true when Firebase is not configured)
@@ -49,6 +51,27 @@ class VerificationService {
         });
   }
 
+  // Get verification requests by user ID
+  Stream<List<VerificationRequest>> getVerificationRequestsByUserId(String userId) {
+    if (useMockData) {
+      return Stream.value(
+        _getMockVerificationRequests()
+            .where((req) => req.userId == userId)
+            .toList(),
+      );
+    }
+    
+    return FirebaseFirestore.instance
+        .collection(_collection)
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final requests = _parseRequests(snapshot.docs);
+          requests.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+          return requests;
+        });
+  }
+
   // Get verification request by ID
   Future<VerificationRequest?> getVerificationRequestById(String id) async {
     if (useMockData) {
@@ -88,6 +111,46 @@ class VerificationService {
     
     // Log the activity
     if (request != null) {
+      Map<String, dynamic> userUpdate = {
+        'isVerified': true,
+      };
+
+      if (request.verificationType == VerificationType.skill && request.skillName != null) {
+        userUpdate['verifiedSkills'] = FieldValue.arrayUnion([request.skillName]);
+        
+        // Also update the teacher profile collection
+        await FirebaseFirestore.instance.collection('teacherProfiles').doc(request.userId).set({
+          'verifiedSkills': FieldValue.arrayUnion([request.skillName]),
+          'isVerified': true,
+        }, SetOptions(merge: true));
+      } else if (request.verificationType == VerificationType.identity) {
+        userUpdate['isIdentityVerified'] = true;
+      }
+
+      await FirebaseFirestore.instance.collection('users').doc(request.userId).set(
+        userUpdate, 
+        SetOptions(merge: true)
+      );
+
+      final now = DateTime.now();
+      await NotificationService.instance.createIfAbsent(
+        AppNotification(
+          id: AppNotification.buildId(
+            sessionId: 'verif_${requestId}',
+            type: NotificationType.verificationApproved,
+            role: NotificationRecipientRole.learner,
+            scheduledAt: now,
+          ),
+          recipientId: request.userId,
+          recipientRole: NotificationRecipientRole.learner,
+          type: NotificationType.verificationApproved,
+          title: 'Verification Approved',
+          body: 'Your verification request for ${request.verificationType.displayName} has been approved. You now have a verified badge!',
+          sessionId: 'verif_${requestId}',
+          createdAt: now,
+        )
+      );
+
       await _activityLogService.logAction(
         moderatorId: moderatorId,
         moderatorName: 'Moderator', // TODO: Get from user profile
@@ -127,6 +190,25 @@ class VerificationService {
     
     // Log the activity
     if (request != null) {
+      final now = DateTime.now();
+      await NotificationService.instance.createIfAbsent(
+        AppNotification(
+          id: AppNotification.buildId(
+            sessionId: 'verif_${requestId}',
+            type: NotificationType.verificationRejected,
+            role: NotificationRecipientRole.learner,
+            scheduledAt: now,
+          ),
+          recipientId: request.userId,
+          recipientRole: NotificationRecipientRole.learner,
+          type: NotificationType.verificationRejected,
+          title: 'Verification Rejected',
+          body: 'Your verification request for ${request.verificationType.displayName} was rejected. Reason: $rejectionReason',
+          sessionId: 'verif_${requestId}',
+          createdAt: now,
+        )
+      );
+
       await _activityLogService.logAction(
         moderatorId: moderatorId,
         moderatorName: 'Moderator', // TODO: Get from user profile
@@ -140,6 +222,44 @@ class VerificationService {
         },
       );
     }
+  }
+
+  // Submit a new verification request (User action)
+  Future<void> submitVerificationRequest({
+    required String userId,
+    required String userName,
+    required VerificationType verificationType,
+    String? userProfileImage,
+    String? fullName,
+    String? identityDocumentUrl,
+    String? skillName,
+    String? experienceDescription,
+    List<String>? evidenceUrls,
+    String? portfolioUrl,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return;
+    }
+    
+    final docRef = FirebaseFirestore.instance.collection(_collection).doc();
+    final request = VerificationRequest(
+      id: docRef.id,
+      userId: userId,
+      userName: userName,
+      userProfileImage: userProfileImage,
+      verificationType: verificationType,
+      fullName: fullName,
+      identityDocumentUrl: identityDocumentUrl,
+      skillName: skillName,
+      experienceDescription: experienceDescription,
+      evidenceUrls: evidenceUrls,
+      portfolioUrl: portfolioUrl,
+      status: VerificationStatus.pending,
+      submittedAt: DateTime.now(),
+    );
+    
+    await docRef.set(request.toFirestore());
   }
 
   // Get statistics

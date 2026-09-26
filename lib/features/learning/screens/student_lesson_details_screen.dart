@@ -10,6 +10,9 @@ import '../../skill_provider/services/review_service.dart';
 import '../../skill_provider/widgets/review_card.dart';
 import '../../skill_provider/widgets/status_chip.dart';
 import '../data/student_lesson_store.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../moderation/models/moderation_report.dart';
+import '../../moderation/services/moderation_service.dart';
 
 class StudentLessonDetailsScreen extends StatefulWidget {
   const StudentLessonDetailsScreen({super.key, required this.lesson});
@@ -146,7 +149,16 @@ class _StudentLessonDetailsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(title: const Text('Lesson details')),
+      appBar: AppBar(
+        title: const Text('Lesson details'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flag_outlined, color: Colors.red),
+            tooltip: 'Report this lesson',
+            onPressed: _showReportDialog,
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.primaryColor),
@@ -318,6 +330,79 @@ class _StudentLessonDetailsScreenState
                 ),
               ],
             ),
+    );
+  }
+
+  void _showReportDialog() {
+    ReportReason reason = ReportReason.spam;
+    final descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Report Lesson'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<ReportReason>(
+                    value: reason,
+                    decoration: const InputDecoration(labelText: 'Reason'),
+                    items: ReportReason.values.map((r) => DropdownMenuItem(
+                      value: r,
+                      child: Text(r.displayName),
+                    )).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => reason = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      hintText: 'Please provide details...',
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitting report...')));
+                  
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  
+                  await ModerationService().submitReport(
+                    reportedBy: currentUser?.uid ?? 'unknown_student',
+                    reporterName: currentUser?.displayName ?? 'Student User',
+                    reportedUserId: lesson.providerId,
+                    relatedContentId: lesson.id,
+                    reason: reason,
+                    description: descriptionController.text,
+                    severity: ReportSeverity.medium,
+                  );
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted successfully.')));
+                  }
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Report'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

@@ -22,6 +22,7 @@ class LearningCourse {
     required this.instructor,
     required this.duration,
     required this.rating,
+    this.isInstructorVerified = false,
     required this.colorValue,
     required this.modules,
     this.enrolled = false,
@@ -36,6 +37,7 @@ class LearningCourse {
   final String instructor;
   final String duration;
   final double rating;
+  final bool isInstructorVerified;
   final int colorValue;
   final List<CourseModule> modules;
   final bool enrolled;
@@ -50,6 +52,7 @@ class LearningCourse {
         instructor: instructor,
         duration: duration,
         rating: rating,
+        isInstructorVerified: isInstructorVerified,
         colorValue: colorValue,
         modules: modules,
         enrolled: enrolled ?? this.enrolled,

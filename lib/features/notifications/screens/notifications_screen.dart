@@ -47,6 +47,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _open(AppNotification notification) async {
     await _service.markRead(notification.id);
+    
+    if (notification.type == NotificationType.verificationApproved ||
+        notification.type == NotificationType.verificationRejected) {
+      context.push('/profile');
+      return;
+    }
+
     final session =
         await SessionService.instance.getSessionById(notification.sessionId);
     if (!mounted) return;
@@ -75,6 +82,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.task_alt_outlined;
       case NotificationType.feedbackRequest:
         return Icons.star_outline;
+      case NotificationType.verificationApproved:
+        return Icons.verified;
+      case NotificationType.verificationRejected:
+        return Icons.cancel_outlined;
     }
   }
 

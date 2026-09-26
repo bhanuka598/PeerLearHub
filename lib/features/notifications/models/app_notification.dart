@@ -5,6 +5,8 @@ enum NotificationType {
   reminder1h,
   completeSession,
   feedbackRequest,
+  verificationApproved,
+  verificationRejected,
 }
 
 enum NotificationRecipientRole { teacher, learner }

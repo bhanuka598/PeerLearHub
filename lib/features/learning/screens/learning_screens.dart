@@ -1001,6 +1001,7 @@ class CourseCard extends StatelessWidget {
                         rating: course.rating,
                         duration: course.duration,
                         extra: 'By ${course.instructor}',
+                        isInstructorVerified: course.isInstructorVerified,
                       ),
                     ],
                   ),
@@ -1900,11 +1901,13 @@ class _CatalogMetaRow extends StatelessWidget {
     required this.rating,
     required this.duration,
     this.extra,
+    this.isInstructorVerified = false,
   });
 
   final double rating;
   final String duration;
   final String? extra;
+  final bool isInstructorVerified;
 
   @override
   Widget build(BuildContext context) {
@@ -1941,14 +1944,25 @@ class _CatalogMetaRow extends StatelessWidget {
         if (extra != null && extra!.trim().isNotEmpty) ...[
           _metaDot(),
           Flexible(
-            child: Text(
-              extra!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    extra!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                if (isInstructorVerified) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.verified, size: 14, color: Colors.blue),
+                ],
+              ],
             ),
           ),
         ],

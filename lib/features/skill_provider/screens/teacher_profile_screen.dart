@@ -23,7 +23,6 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   final _emailController = TextEditingController();
   final _locationController = TextEditingController();
   final _bioController = TextEditingController();
-  final _skillController = TextEditingController();
 
   TeacherProfile? _profile;
   List<String> _skills = [];
@@ -44,7 +43,6 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
     _emailController.dispose();
     _locationController.dispose();
     _bioController.dispose();
-    _skillController.dispose();
     super.dispose();
   }
 
@@ -69,20 +67,10 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
     _imageUrl = profile.profileImageUrl;
   }
 
-  void _includePendingSkill() {
-    final skill = _skillController.text.trim();
-    if (skill.isEmpty) return;
-    if (!_skills.contains(skill)) {
-      _skills = [..._skills, skill];
-    }
-    _skillController.clear();
-  }
-
   Future<void> _save() async {
     if (_profile == null) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    _includePendingSkill();
     setState(() => _saving = true);
     try {
       final uid = await ensureProviderId();
@@ -128,20 +116,6 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
     );
     if (!mounted) return;
     setState(() => _imageUrl = url ?? _imageUrl);
-  }
-
-  void _addSkill() {
-    final skill = _skillController.text.trim();
-    if (skill.isEmpty) return;
-    if (_skills.contains(skill)) {
-      _skillController.clear();
-      setState(() {});
-      return;
-    }
-    setState(() {
-      _skills = [..._skills, skill];
-      _skillController.clear();
-    });
   }
 
   String _dash(String? value) {
@@ -249,11 +223,24 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            _editing ? _nameController.text.trim().isEmpty
-                ? profile.displayName
-                : _nameController.text.trim() : profile.displayName,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _editing ? _nameController.text.trim().isEmpty
+                    ? profile.displayName
+                    : _nameController.text.trim() : profile.displayName,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+              if (profile.isVerified) ...[
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.verified,
+                  color: Colors.blue,
+                  size: 22,
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 6),
           Row(
@@ -332,12 +319,12 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_skills.isEmpty && !_editing)
+          if (_skills.isEmpty)
             const Text(
-              'No skills added yet.',
+              'No skills added yet. Request skill verification to add them!',
               style: TextStyle(color: AppTheme.textSecondary),
             )
-          else if (_skills.isNotEmpty)
+          else
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -351,35 +338,15 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                       ),
                       label: Text(skill),
                       backgroundColor: AppTheme.iconBackground,
-                      onDeleted: _editing
-                          ? () => setState(() {
-                                _skills = _skills.where((s) => s != skill).toList();
-                              })
-                          : null,
                     ),
                   )
                   .toList(),
             ),
           if (_editing) ...[
-            if (_skills.isNotEmpty) const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _skillController,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a skill, then tap Add',
-                    ),
-                    onSubmitted: (_) => _addSkill(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _addSkill,
-                  child: const Text('Add'),
-                ),
-              ],
+            const SizedBox(height: 16),
+            const Text(
+              'Verified skills cannot be manually added or deleted. Please submit a Skill Verification request from your main profile to add new skills.',
+              style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
             ),
           ],
         ],

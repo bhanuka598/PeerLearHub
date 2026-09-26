@@ -58,6 +58,7 @@ class ExchangeCourse {
   final String ownerAvatar;
   final UserRole ownerRole;
   final double rating;
+  final bool isOwnerVerified;
   final int totalLessons;
   final int durationMinutes;
   final String thumbnailUrl;
@@ -74,6 +75,7 @@ class ExchangeCourse {
     required this.ownerAvatar,
     required this.ownerRole,
     this.rating = 4.8,
+    this.isOwnerVerified = false,
     this.totalLessons = 8,
     this.durationMinutes = 120,
     required this.thumbnailUrl,
@@ -91,6 +93,7 @@ class ExchangeCourse {
     String? ownerAvatar,
     UserRole? ownerRole,
     double? rating,
+    bool? isOwnerVerified,
     int? totalLessons,
     int? durationMinutes,
     String? thumbnailUrl,
@@ -107,6 +110,7 @@ class ExchangeCourse {
       ownerAvatar: ownerAvatar ?? this.ownerAvatar,
       ownerRole: ownerRole ?? this.ownerRole,
       rating: rating ?? this.rating,
+      isOwnerVerified: isOwnerVerified ?? this.isOwnerVerified,
       totalLessons: totalLessons ?? this.totalLessons,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,

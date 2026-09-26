@@ -9,7 +9,7 @@ class MessageService extends ChangeNotifier {
   MessageService._();
 
   static final MessageService instance = MessageService._();
-  static bool useMockData = true;
+  static bool useMockData = false;
 
   static const _threadsCollection = 'messageThreads';
   static const _messagesCollection = 'messages';

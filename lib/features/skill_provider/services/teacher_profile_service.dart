@@ -63,8 +63,17 @@ class TeacherProfileService extends ChangeNotifier {
     }
 
     profile = await _withReviewStats(profile);
+    
+    try {
+      final userDoc = await _usersRef.doc(uid).get();
+      final isVerified = userDoc.data()?['isVerified'] == true;
+      profile = profile.copyWith(isVerified: isVerified);
+    } catch (e) {
+      debugPrint('Error fetching user isVerified: $e');
+    }
+
     _cached = profile;
-    return profile;
+    return profile!;
   }
 
   Future<void> updateProfile(TeacherProfile profile) async {

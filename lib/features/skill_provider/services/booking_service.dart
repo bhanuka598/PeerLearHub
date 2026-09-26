@@ -11,7 +11,7 @@ class BookingService extends ChangeNotifier {
   }
 
   static final BookingService instance = BookingService._();
-  static bool useMockData = true;
+  static bool useMockData = false;
 
   static const _collection = 'bookingRequests';
   final List<BookingRequest> _bookings = [];

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../models/verification_request.dart';
 import '../services/verification_service.dart';
@@ -63,7 +64,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          ElevatedButton(     
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
@@ -291,6 +292,14 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                 _request!.skillName ?? 'Not specified',
                               ),
                             ],
+                            if (_request!.verificationType == VerificationType.identity) ...[
+                              const SizedBox(height: 12),
+                              _buildInfoRow(
+                                Icons.person_outline,
+                                'Full Name',
+                                _request!.fullName ?? 'Not specified',
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -337,6 +346,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                       ],
 
                       if (_request!.portfolioUrl != null ||
+                          _request!.identityDocumentUrl != null ||
                           (_request!.evidenceUrls != null &&
                               _request!.evidenceUrls!.isNotEmpty)) ...[
                         const SizedBox(height: 16),
@@ -357,7 +367,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Evidence',
+                                'Evidence / Links',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -370,6 +380,16 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                   Icons.link,
                                   'Portfolio',
                                   _request!.portfolioUrl!,
+                                ),
+                              if (_request!.identityDocumentUrl != null)
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                      top: _request!.portfolioUrl != null ? 8.0 : 0.0),
+                                  child: _buildLinkItem(
+                                    Icons.badge_outlined,
+                                    'ID Document',
+                                    _request!.identityDocumentUrl!,
+                                  ),
                                 ),
                               if (_request!.evidenceUrls != null)
                                 ..._request!.evidenceUrls!.map(
@@ -545,41 +565,73 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
   }
 
   Widget _buildLinkItem(IconData icon, String label, String url) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.primaryTeal),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+    return InkWell(
+      onTap: () async {
+        try {
+          String launchUrlStr = url.trim();
+          if (!launchUrlStr.startsWith('http://') && !launchUrlStr.startsWith('https://')) {
+            launchUrlStr = 'https://$launchUrlStr';
+          }
+          final uri = Uri.parse(launchUrlStr);
+          final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (!launched) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not open link')),
+              );
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Invalid URL')),
+            );
+          }
+        }
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppColors.primaryTeal),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                Text(
-                  url,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primaryTeal,
+                  Text(
+                    url,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primaryTeal,
+                      decoration: TextDecoration.underline,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            const Icon(
+              Icons.open_in_new,
+              size: 16,
+              color: Colors.grey,
+            ),
+          ],
+        ),
       ),
     );
   }

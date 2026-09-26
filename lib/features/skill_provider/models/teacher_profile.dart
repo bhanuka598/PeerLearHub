@@ -12,6 +12,7 @@ class TeacherProfile {
     this.profileImageUrl,
     this.email,
     this.location,
+    this.isVerified = false,
   });
 
   final String uid;
@@ -24,6 +25,7 @@ class TeacherProfile {
   final String? profileImageUrl;
   final String? email;
   final String? location;
+  final bool isVerified;
 
   TeacherProfile copyWith({
     String? displayName,
@@ -36,6 +38,7 @@ class TeacherProfile {
     int? completedSessions,
     int? totalReviews,
     bool clearImage = false,
+    bool? isVerified,
   }) {
     return TeacherProfile(
       uid: uid,
@@ -49,6 +52,7 @@ class TeacherProfile {
           clearImage ? null : (profileImageUrl ?? this.profileImageUrl),
       email: email ?? this.email,
       location: location ?? this.location,
+      isVerified: isVerified ?? this.isVerified,
     );
   }
 
@@ -82,6 +86,7 @@ class TeacherProfile {
       profileImageUrl: data['profileImageUrl'] as String?,
       email: data['email'] as String?,
       location: data['location'] as String?,
+      isVerified: data['isVerified'] as bool? ?? false,
     );
   }
 }

@@ -11,7 +11,7 @@ class NotificationService extends ChangeNotifier {
   NotificationService._();
 
   static final NotificationService instance = NotificationService._();
-  static bool useMockData = true;
+  static bool useMockData = false;
 
   static const _collection = 'notifications';
   final List<AppNotification> _notifications = [];

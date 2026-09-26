@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:peer_learn_hub/core/auth/auth_service.dart';
 import 'package:peer_learn_hub/core/widgets/role_switcher_button.dart';
+import 'package:peer_learn_hub/features/moderation/models/verification_request.dart';
+import 'package:peer_learn_hub/features/moderation/services/verification_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -50,6 +52,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'location': userDocument['location'] ?? '',
         'phoneNumber': userDocument['phoneNumber'] ?? '',
         'createdAt': userDocument['createdAt'],
+        'isVerified': userDocument['isVerified'] ?? false,
+        'isIdentityVerified': userDocument['isIdentityVerified'] ?? false,
+        'verifiedSkills': List<String>.from(userDocument['verifiedSkills'] ?? []),
       };
 
       final assignmentsSnapshot = await userDocRef
@@ -93,6 +98,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showVerificationDialog(BuildContext context, String uid, String name, String? photoUrl, bool isIdentityVerified) {
+    VerificationType type = VerificationType.skill;
+    final textController1 = TextEditingController();
+    final textController2 = TextEditingController();
+    final textController3 = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Request Verification'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<VerificationType>(
+                    value: type,
+                    decoration: const InputDecoration(labelText: 'Verification Type'),
+                    items: VerificationType.values
+                        .where((t) => !isIdentityVerified || t != VerificationType.identity)
+                        .map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t.displayName),
+                    )).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => type = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (type == VerificationType.skill) ...[
+                    TextField(
+                      controller: textController1,
+                      decoration: const InputDecoration(labelText: 'Skill Name'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: textController2,
+                      decoration: const InputDecoration(labelText: 'Experience Description'),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: textController3,
+                      decoration: const InputDecoration(labelText: 'Portfolio / Evidence URL (Optional)'),
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: textController1,
+                      decoration: const InputDecoration(labelText: 'Full Name (as per ID)'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: textController2,
+                      decoration: const InputDecoration(labelText: 'ID Document URL (Google Drive, etc.)'),
+                    ),
+                  ]
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitting request...')));
+                  await VerificationService().submitVerificationRequest(
+                    userId: uid,
+                    userName: name,
+                    userProfileImage: photoUrl,
+                    verificationType: type,
+                    skillName: type == VerificationType.skill ? textController1.text : null,
+                    experienceDescription: type == VerificationType.skill ? textController2.text : null,
+                    portfolioUrl: type == VerificationType.skill && textController3.text.isNotEmpty ? textController3.text : null,
+                    fullName: type == VerificationType.identity ? textController1.text : null,
+                    identityDocumentUrl: type == VerificationType.identity ? textController2.text : null,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification requested successfully!')));
+                  }
+                },
+                child: const Text('Submit'),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -104,6 +198,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final memberSince = _userData?['createdAt'];
     final bio = _userData?['bio']?.toString();
     final location = _userData?['location']?.toString();
+    final isVerified = _userData?['isVerified'] == true;
+    final isIdentityVerified = _userData?['isIdentityVerified'] == true;
+    final verifiedSkills = List<String>.from(_userData?['verifiedSkills'] ?? []);
 
     return Scaffold(
       appBar: AppBar(
@@ -140,9 +237,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      displayName,
-                                      style: Theme.of(context).textTheme.titleLarge,
+                                    Row(
+                                      children: [
+                                        Text(
+                                          displayName,
+                                          style: Theme.of(context).textTheme.titleLarge,
+                                        ),
+                                        if (isVerified || isIdentityVerified) ...[
+                                          const SizedBox(width: 6),
+                                          const Icon(
+                                            Icons.verified,
+                                            color: Colors.blue,
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
@@ -312,6 +421,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         )),
 
                   const SizedBox(height: 24),
+                  
+                  if (verifiedSkills.isNotEmpty) ...[
+                    Text(
+                      'Verified Skills',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: verifiedSkills.map((skill) => Chip(
+                        label: Text(skill),
+                        backgroundColor: Colors.teal.withOpacity(0.1),
+                        side: BorderSide.none,
+                        avatar: const Icon(Icons.verified, size: 16, color: Colors.teal),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  _VerificationStatusWidget(userId: user!.uid),
+                  const SizedBox(height: 16),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showVerificationDialog(context, user.uid, displayName, photoUrl, isIdentityVerified),
+                      icon: const Icon(Icons.verified_user_outlined),
+                      label: const Text('Request Verification'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   SizedBox(
                     width: double.infinity,
@@ -376,6 +517,101 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VerificationStatusWidget extends StatelessWidget {
+  final String userId;
+
+  const _VerificationStatusWidget({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<VerificationRequest>>(
+      stream: VerificationService().getVerificationRequestsByUserId(userId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final requests = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Verification Requests',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            ...requests.map((req) {
+              final statusStr = req.status.name;
+              final type = req.verificationType.name;
+              final reason = req.rejectionReason;
+              
+              Color statusColor = Colors.orange;
+              IconData statusIcon = Icons.pending_actions;
+              String statusText = 'Pending';
+
+              if (statusStr == 'approved') {
+                statusColor = Colors.green;
+                statusIcon = Icons.check_circle;
+                statusText = 'Approved';
+              } else if (statusStr == 'rejected') {
+                statusColor = Colors.red;
+                statusIcon = Icons.cancel;
+                statusText = 'Rejected';
+              }
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(statusIcon, color: statusColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${type[0].toUpperCase()}${type.substring(1)} Verification',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              statusText,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (statusStr == 'rejected' && reason != null && reason.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Reason: $reason',
+                          style: TextStyle(color: Colors.red.shade700),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
     );
   }
 }
