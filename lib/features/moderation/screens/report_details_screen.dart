@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../models/moderation_report.dart';
+import 'package:go_router/go_router.dart';
+import '../../skill_provider/services/firebase_lesson_service.dart';
+import '../../learning/data/learning_store.dart';
 import '../services/moderation_service.dart';
+import '../../learning/screens/student_lesson_details_screen.dart';
+import '../../learning/screens/learning_screens.dart';
 
 class ReportDetailsScreen extends StatefulWidget {
   final String reportId;
@@ -120,118 +125,142 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFB),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Report Details',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _report == null
-              ? const Center(child: Text('Report not found'))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF0F766E), Color(0xFF2DD4BF)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryTeal.withOpacity(0.2),
-                              blurRadius: 18,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: Colors.white.withOpacity(0.18),
-                              backgroundImage: const AssetImage(
-                                'assets/images/profile_hero.png',
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Report Details',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _report == null
+                      ? const Center(child: Text('Report not found'))
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 800),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _report!.reason.displayName,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.04),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.14),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          _report!.status.displayName,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                        ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        color: _getSeverityColor().withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.14),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          _report!.severity.displayName,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                        ),
+                                      child: Icon(
+                                        Icons.report_problem_rounded,
+                                        color: _getSeverityColor(),
+                                        size: 32,
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _report!.reason.displayName,
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: _getStatusColor().withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  _report!.status.displayName,
+                                                  style: TextStyle(
+                                                    color: _getStatusColor(),
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: _getSeverityColor().withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  _report!.severity.displayName,
+                                                  style: TextStyle(
+                                                    color: _getSeverityColor(),
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 16),
 
                       Container(
@@ -300,7 +329,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Users involved',
+                              'Reported Target',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -308,6 +337,22 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
+                            if (_report!.relatedContentType != null) ...[
+                              _buildInfoRow(
+                                Icons.category_outlined,
+                                'Content Type',
+                                _report!.relatedContentType!,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_report!.relatedContentTitle != null) ...[
+                              _buildInfoRow(
+                                Icons.title_outlined,
+                                'Content Title',
+                                _report!.relatedContentTitle!,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             _buildInfoRow(
                               Icons.person_off_outlined,
                               'Reported user',
@@ -319,12 +364,28 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                               'Reporter',
                               _report!.reporterName ?? 'Anonymous',
                             ),
+                            if (_report!.relatedContentType != null && _report!.relatedContentId != null) ...[
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: () => _viewReportedContent(context),
+                                  icon: const Icon(Icons.visibility_outlined),
+                                  label: const Text('View Reported Content'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F766E),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                       const SizedBox(height: 16),
 
                       Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -493,6 +554,12 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ],
                   ),
                 ),
+              ),
+            ),
+          ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -538,6 +605,60 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         ),
       ],
     );
+
+  }
+
+  Future<void> _viewReportedContent(BuildContext context) async {
+    final report = _report!;
+    if (report.relatedContentType == 'Lesson') {
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loading lesson...')));
+        final lesson = await FirebaseLessonService.instance.getLessonById(report.relatedContentId!);
+        if (lesson != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentLessonDetailsScreen(
+                lesson: lesson,
+                isReportPreview: true,
+              ),
+            ),
+          );
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lesson not found or deleted.')));
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading lesson: $e')));
+        }
+      }
+    } else if (report.relatedContentType == 'Course') {
+      try {
+        final course = LearningStore.instance.value.firstWhere(
+          (c) => c.id == report.relatedContentId,
+          orElse: () => throw Exception('Course not found'),
+        );
+        if (context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CourseDetailsScreen(
+                course: course,
+                isReportPreview: true,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Course not found or deleted.')));
+        }
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cannot view content of type: ${report.relatedContentType}')),
+      );
+    }
   }
 }
 

@@ -95,8 +95,9 @@ class RouterClass {
         path: '/learning/course',
         builder: (context, state) {
           final course = state.extra;
+          final isReportPreview = state.uri.queryParameters['isReportPreview'] == 'true';
           return course is LearningCourse
-              ? CourseDetailsScreen(course: course)
+              ? CourseDetailsScreen(course: course, isReportPreview: isReportPreview)
               : const DiscoverScreen();
         },
       ),
@@ -113,8 +114,9 @@ class RouterClass {
         path: '/learning/provider-lesson',
         builder: (context, state) {
           final lesson = state.extra;
+          final isReportPreview = state.uri.queryParameters['isReportPreview'] == 'true';
           return lesson is Lesson
-              ? StudentLessonDetailsScreen(lesson: lesson)
+              ? StudentLessonDetailsScreen(lesson: lesson, isReportPreview: isReportPreview)
               : const DiscoverScreen();
         },
       ),

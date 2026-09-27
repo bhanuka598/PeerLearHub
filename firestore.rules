@@ -44,5 +44,27 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read, write: if request.auth != null;
     }
+
+    // Helper function to check if user is moderator
+    function isModerator() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
+    }
+
+    match /reports/{reportId} {
+      allow read: if request.auth != null && (isModerator() || resource.data.reportedBy == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update, delete: if isModerator();
+    }
+
+    match /verificationRequests/{requestId} {
+      allow read: if request.auth != null && (isModerator() || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update, delete: if isModerator();
+    }
+
+    match /moderationLogs/{logId} {
+      allow read, write: if isModerator();
+    }
   }
 }

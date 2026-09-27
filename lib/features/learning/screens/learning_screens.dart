@@ -19,6 +19,8 @@ import '../data/learning_store.dart';
 import '../data/student_lesson_store.dart';
 import '../models/learning_course.dart';
 import '../models/learning_quiz.dart';
+import '../../moderation/models/moderation_report.dart';
+import '../../moderation/services/moderation_service.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -287,15 +289,79 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 }
 
 class CourseDetailsScreen extends StatelessWidget {
-  const CourseDetailsScreen({super.key, required this.course});
+  const CourseDetailsScreen({
+    super.key,
+    required this.course,
+    this.isReportPreview = false,
+  });
   final LearningCourse course;
-
+  final bool isReportPreview;
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Course details')),
+        appBar: AppBar(
+          title: Text(isReportPreview ? 'Reported Course Preview' : 'Course details'),
+          leading: isReportPreview ? IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+            tooltip: 'Back to Report',
+          ) : null,
+          actions: [
+            if (!isReportPreview)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  if (value == 'report') {
+                    _showReportDialog(context, course);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'report',
+                    child: Row(
+                      children: [
+                        Icon(Icons.report, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text('Report Course', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (isReportPreview)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'You are viewing this course as a moderator in preview mode.',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.orange.shade800,
+                      ),
+                      child: const Text('Back to Report'),
+                    ),
+                  ],
+                ),
+              ),
             _CourseHero(course: course),
             const SizedBox(height: 24),
             Text(
@@ -346,6 +412,106 @@ class CourseDetailsScreen extends StatelessWidget {
           ),
         ),
       );
+
+  void _showReportDialog(BuildContext context, LearningCourse course) {
+    ReportReason reason = ReportReason.spam;
+    final descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Report Course'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<ReportReason>(
+                    value: reason,
+                    decoration: const InputDecoration(labelText: 'Reason'),
+                    items: ReportReason.values.map((r) => DropdownMenuItem(
+                      value: r,
+                      child: Text(r.displayName),
+                    )).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => reason = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      hintText: 'Please provide details...',
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitting report...')));
+                  
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  
+                  await ModerationService().submitReport(
+                    reportedBy: currentUser?.uid ?? 'unknown_student',
+                    reporterName: currentUser?.displayName ?? 'Student User',
+                    reportedUserId: 'provider_123', // Dummy provider ID for mock course
+                    reportedUserName: course.instructor,
+                    relatedContentId: course.id,
+                    relatedContentType: 'Course',
+                    relatedContentTitle: course.title,
+                    reason: reason,
+                    description: descriptionController.text,
+                    severity: ReportSeverity.medium,
+                  );
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted successfully.')));
+                    
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Block Instructor?'),
+                        content: Text('Would you also like to block ${course.instructor} so you no longer see their content?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('No'),
+                          ),
+                          FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('${course.instructor} blocked.')),
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text('Block'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Report'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class MyLearningScreen extends StatefulWidget {

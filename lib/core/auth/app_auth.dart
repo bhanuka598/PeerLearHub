@@ -153,9 +153,13 @@ class AppAuth extends ChangeNotifier {
             _skillProviderRoutes.contains(cleanLocation);
       case AppUserRole.moderator:
         return cleanLocation == '/moderation' ||
+            cleanLocation == '/learning/course' ||
+            cleanLocation == '/learning/provider-lesson' ||
             cleanLocation == '/profile';
       case AppUserRole.admin:
         return cleanLocation == '/moderation' ||
+            cleanLocation == '/learning/course' ||
+            cleanLocation == '/learning/provider-lesson' ||
             cleanLocation == '/profile';
       case null:
         return false;

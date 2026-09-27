@@ -70,6 +70,8 @@ class ModerationReport {
   final String reportedUserId;
   final String? reportedUserName;
   final String? relatedContentId;
+  final String? relatedContentType;
+  final String? relatedContentTitle;
   final ReportReason reason;
   final String description;
   final ReportSeverity severity;
@@ -86,6 +88,8 @@ class ModerationReport {
     required this.reportedUserId,
     this.reportedUserName,
     this.relatedContentId,
+    this.relatedContentType,
+    this.relatedContentTitle,
     required this.reason,
     required this.description,
     required this.severity,
@@ -106,6 +110,8 @@ class ModerationReport {
       reportedUserId: _asString(data['reportedUserId']),
       reportedUserName: _asNullableString(data['reportedUserName']),
       relatedContentId: _asNullableString(data['relatedContentId']),
+      relatedContentType: _asNullableString(data['relatedContentType']),
+      relatedContentTitle: _asNullableString(data['relatedContentTitle']),
       reason: ReportReason.values.firstWhere(
         (e) => e.name == _asString(data['reason']),
         orElse: () => ReportReason.other,
@@ -166,6 +172,8 @@ class ModerationReport {
       'reportedUserId': reportedUserId,
       'reportedUserName': reportedUserName,
       'relatedContentId': relatedContentId,
+      'relatedContentType': relatedContentType,
+      'relatedContentTitle': relatedContentTitle,
       'reason': reason.name,
       'description': description,
       'severity': severity.name,
@@ -185,6 +193,8 @@ class ModerationReport {
     String? reportedUserId,
     String? reportedUserName,
     String? relatedContentId,
+    String? relatedContentType,
+    String? relatedContentTitle,
     ReportReason? reason,
     String? description,
     ReportSeverity? severity,
@@ -201,6 +211,8 @@ class ModerationReport {
       reportedUserId: reportedUserId ?? this.reportedUserId,
       reportedUserName: reportedUserName ?? this.reportedUserName,
       relatedContentId: relatedContentId ?? this.relatedContentId,
+      relatedContentType: relatedContentType ?? this.relatedContentType,
+      relatedContentTitle: relatedContentTitle ?? this.relatedContentTitle,
       reason: reason ?? this.reason,
       description: description ?? this.description,
       severity: severity ?? this.severity,

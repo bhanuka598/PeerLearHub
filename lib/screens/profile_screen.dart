@@ -5,6 +5,9 @@ import 'package:peer_learn_hub/core/auth/auth_service.dart';
 import 'package:peer_learn_hub/core/widgets/role_switcher_button.dart';
 import 'package:peer_learn_hub/features/moderation/models/verification_request.dart';
 import 'package:peer_learn_hub/features/moderation/services/verification_service.dart';
+import 'package:peer_learn_hub/features/moderation/models/moderation_report.dart';
+import 'package:peer_learn_hub/features/moderation/services/moderation_service.dart';
+import 'package:peer_learn_hub/features/moderation/screens/support_inbox_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -214,6 +217,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showReportDialog(BuildContext context, String uid, String name) {
+    ReportReason reason = ReportReason.spam;
+    final descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isSubmitting = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Report User'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<ReportReason>(
+                      value: reason,
+                      decoration: const InputDecoration(labelText: 'Reason for reporting'),
+                      items: ReportReason.values.map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text(r.displayName),
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => reason = val);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Additional Details (Optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isSubmitting ? null : () async {
+                    setState(() => isSubmitting = true);
+                    final currentUser = FirebaseAuth.instance.currentUser;
+                    
+                    try {
+                      await ModerationService().submitReport(
+                        reportedBy: currentUser?.uid ?? 'unknown',
+                        reporterName: currentUser?.displayName ?? 'User',
+                        reportedUserId: uid,
+                        reportedUserName: name,
+                        relatedContentId: uid,
+                        relatedContentType: 'User Profile',
+                        relatedContentTitle: name,
+                        reason: reason,
+                        description: descriptionController.text,
+                        severity: ReportSeverity.medium,
+                      );
+                      
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Report submitted successfully.')),
+                        );
+                        
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Block User?'),
+                            content: Text('Would you also like to block $name so you no longer see their content?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('No'),
+                              ),
+                              FilledButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('$name blocked.')),
+                                  );
+                                },
+                                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                child: const Text('Block'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      setState(() => isSubmitting = false);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error submitting report: $e')),
+                        );
+                      }
+                    }
+                  },
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: isSubmitting
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Report'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -232,7 +350,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
-        actions: const [RoleSwitcherButton()],
+        actions: [
+          const RoleSwitcherButton(),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'report' && user != null) {
+                _showReportDialog(context, user.uid, displayName);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(Icons.report, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Text('Report User', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -479,6 +619,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: const Text('Request Verification'),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SupportInboxScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.inbox_outlined),
+                      label: const Text('Support Inbox'),
+                    ),
+                  ),
+
                   const SizedBox(height: 16),
 
                   SizedBox(

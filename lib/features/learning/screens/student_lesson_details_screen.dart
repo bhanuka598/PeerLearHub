@@ -11,13 +11,19 @@ import '../../skill_provider/widgets/review_card.dart';
 import '../../skill_provider/widgets/status_chip.dart';
 import '../data/student_lesson_store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
 
 class StudentLessonDetailsScreen extends StatefulWidget {
-  const StudentLessonDetailsScreen({super.key, required this.lesson});
+  const StudentLessonDetailsScreen({
+    super.key,
+    required this.lesson,
+    this.isReportPreview = false,
+  });
 
   final Lesson lesson;
+  final bool isReportPreview;
 
   @override
   State<StudentLessonDetailsScreen> createState() =>
@@ -150,13 +156,19 @@ class _StudentLessonDetailsScreenState
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text('Lesson details'),
+        title: Text(widget.isReportPreview ? 'Reported Lesson Preview' : 'Lesson details'),
+        leading: widget.isReportPreview ? IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back to Report',
+        ) : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flag_outlined, color: Colors.red),
-            tooltip: 'Report this lesson',
-            onPressed: _showReportDialog,
-          ),
+          if (!widget.isReportPreview)
+            IconButton(
+              icon: const Icon(Icons.flag_outlined, color: Colors.red),
+              tooltip: 'Report this lesson',
+              onPressed: _showReportDialog,
+            ),
         ],
       ),
       body: _loading
@@ -166,6 +178,36 @@ class _StudentLessonDetailsScreenState
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
               children: [
+                if (widget.isReportPreview)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'You are viewing this lesson as a moderator in preview mode.',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.orange.shade800,
+                          ),
+                          child: const Text('Back to Report'),
+                        ),
+                      ],
+                    ),
+                  ),
                 Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 800),
@@ -387,6 +429,8 @@ class _StudentLessonDetailsScreenState
                     reporterName: currentUser?.displayName ?? 'Student User',
                     reportedUserId: lesson.providerId,
                     relatedContentId: lesson.id,
+                    relatedContentType: 'Lesson',
+                    relatedContentTitle: lesson.title,
                     reason: reason,
                     description: descriptionController.text,
                     severity: ReportSeverity.medium,
@@ -394,6 +438,30 @@ class _StudentLessonDetailsScreenState
                   
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted successfully.')));
+                    
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Block Provider?'),
+                        content: const Text('Would you also like to block this provider so you no longer see their content?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('No'),
+                          ),
+                          FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Provider blocked.')),
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text('Block'),
+                          ),
+                        ],
+                      ),
+                    );
                   }
                 },
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
