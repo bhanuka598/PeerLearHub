@@ -37,9 +37,10 @@ class SessionService extends ChangeNotifier {
     final snapshot = await FirebaseFirestore.instance
         .collection(_collection)
         .where('providerId', isEqualTo: providerId)
-        .orderBy('scheduledAt')
         .get();
-    return snapshot.docs.map(ProviderSession.fromFirestore).toList();
+    final list = snapshot.docs.map(ProviderSession.fromFirestore).toList();
+    list.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    return list;
   }
 
   Future<List<ProviderSession>> getSessionsByLearner(String learnerId) async {
@@ -51,9 +52,10 @@ class SessionService extends ChangeNotifier {
     final snapshot = await FirebaseFirestore.instance
         .collection(_collection)
         .where('learnerId', isEqualTo: learnerId)
-        .orderBy('scheduledAt')
         .get();
-    return snapshot.docs.map(ProviderSession.fromFirestore).toList();
+    final list = snapshot.docs.map(ProviderSession.fromFirestore).toList();
+    list.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    return list;
   }
 
   Future<List<ProviderSession>> getUpcomingSessions(String providerId) async {

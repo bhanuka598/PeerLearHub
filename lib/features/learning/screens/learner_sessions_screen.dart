@@ -20,6 +20,7 @@ class _LearnerSessionsScreenState extends State<LearnerSessionsScreen> {
   final _service = SessionService.instance;
   List<ProviderSession> _sessions = [];
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -35,11 +36,20 @@ class _LearnerSessionsScreenState extends State<LearnerSessionsScreen> {
   }
 
   Future<void> _load() async {
-    final list = await _service.getSessionsByLearner(getCurrentProviderId());
-    if (mounted) {
+    try {
+      final list = await _service.getSessionsByLearner(getCurrentProviderId());
+      if (!mounted) return;
       setState(() {
         _sessions = list;
         _loading = false;
+        _loadError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _sessions = [];
+        _loading = false;
+        _loadError = 'Could not load your sessions. Pull down to try again.';
       });
     }
   }
@@ -65,9 +75,9 @@ class _LearnerSessionsScreenState extends State<LearnerSessionsScreen> {
               onRefresh: _load,
               child: _sessions.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 80),
-                        Center(child: Text('No sessions yet.')),
+                      children: [
+                        const SizedBox(height: 80),
+                        Center(child: Text(_loadError ?? 'No sessions yet.')),
                       ],
                     )
                   : ListView.builder(

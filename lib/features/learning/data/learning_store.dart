@@ -33,8 +33,8 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
       value = [
         for (final course in value)
           course.copyWith(
-            enrolled: saved.containsKey(course.id),
-            progress: saved[course.id]?['progress'] as int? ?? 0,
+            enrolled: course.enrolled || saved.containsKey(course.id),
+            progress: (saved[course.id]?['progress'] as num?)?.toInt() ?? course.progress,
           ),
       ];
       for (final entry in saved.entries) {
