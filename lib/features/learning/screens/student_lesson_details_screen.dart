@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
@@ -15,6 +18,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/assignment_service.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
 
@@ -46,6 +50,10 @@ class _StudentLessonDetailsScreenState
   bool _quizCompleted = false;
   int _currentVideoIndex = 0;
   final Set<int> _completedVideoIndices = {};
+  final _assignmentDescriptionController = TextEditingController();
+  final _assignmentGithubController = TextEditingController();
+  bool _submittingAssignment = false;
+  bool _assignmentSubmitted = false;
 
   Lesson get lesson => _lesson;
 
@@ -62,6 +70,8 @@ class _StudentLessonDetailsScreenState
   void dispose() {
     _reviewService.removeListener(_onReviewsChanged);
     _commentController.dispose();
+    _assignmentDescriptionController.dispose();
+    _assignmentGithubController.dispose();
     super.dispose();
   }
 
@@ -383,6 +393,10 @@ class _StudentLessonDetailsScreenState
                         if (_enrolled) ...[
                           const SizedBox(height: 16),
                           _quizCheckpointCard(),
+                        ],
+                        if (_enrolled && _quizCompleted) ...[
+                          const SizedBox(height: 16),
+                          _assignmentSubmissionCard(),
                         ],
                         const SizedBox(height: 16),
                         _rateCard(),
@@ -1093,6 +1107,241 @@ class _StudentLessonDetailsScreenState
         },
       ),
     );
+  }
+
+  Widget _assignmentSubmissionCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.iconBackground,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.assignment_turned_in, color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Lesson Assignment & Certificate',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_assignmentSubmitted) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 28),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Assignment Submitted Successfully!',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Your GitHub repository has been reviewed and certificate awarded.',
+                              style: TextStyle(fontSize: 12, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  const Row(
+                    children: [
+                      Icon(Icons.workspace_premium, color: Colors.amber, size: 32),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Certificate of Completion Awarded',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'System verified your completion. Download your official PDF certificate below.',
+                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _downloadCertificate,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                    ),
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('Download Certificate (PDF)'),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const Text(
+              'Now that you have completed the video quizzes, submit your assignment by entering a brief description and your GitHub repository URL.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _assignmentDescriptionController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Assignment Description',
+                hintText: 'Describe what you built or learned in this lesson...',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _assignmentGithubController,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'GitHub Repository URL',
+                hintText: 'https://github.com/username/repository',
+                prefixIcon: Icon(Icons.link),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _submittingAssignment ? null : _submitAssignment,
+              icon: _submittingAssignment
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.send),
+              label: Text(_submittingAssignment ? 'Submitting...' : 'Submit Assignment'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<Uint8List> _generateCertificateBytes() async {
+    final document = pw.Document();
+    document.addPage(
+      pw.Page(
+        build: (context) => pw.Center(
+          child: pw.Column(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Text(
+                'CERTIFICATE OF COMPLETION',
+                style: pw.TextStyle(
+                  fontSize: 24,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 24),
+              pw.Text('This certifies that the learner successfully completed'),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                lesson.title,
+                style: pw.TextStyle(
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 24),
+              pw.Text('Awarded by PeerLearnHub System'),
+              pw.SizedBox(height: 8),
+              pw.Text('Date: ${DateTime.now().toLocal().toString().split(' ')[0]}'),
+            ],
+          ),
+        ),
+      ),
+    );
+    return document.save();
+  }
+
+  Future<void> _downloadCertificate() async {
+    try {
+      final bytes = await _generateCertificateBytes();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'peerlearnhub-lesson-${lesson.id}-certificate.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download certificate: $e')),
+      );
+    }
+  }
+
+  Future<void> _submitAssignment() async {
+    final description = _assignmentDescriptionController.text.trim();
+    final githubUrl = _assignmentGithubController.text.trim();
+
+    if (description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an assignment description.')),
+      );
+      return;
+    }
+    if (githubUrl.isEmpty || !githubUrl.contains('github.com/')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid GitHub repository URL.')),
+      );
+      return;
+    }
+
+    setState(() => _submittingAssignment = true);
+    try {
+      await AssignmentService.instance.submit(
+        courseId: lesson.id,
+        description: description,
+        githubUrl: githubUrl,
+      );
+      if (!mounted) return;
+      setState(() => _assignmentSubmitted = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Assignment submitted successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Bad state: ', '').replaceFirst('StateError: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _submittingAssignment = false);
+    }
   }
 
   Future<void> _awardQuizPoints() async {
