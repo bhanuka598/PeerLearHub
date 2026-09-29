@@ -26,6 +26,7 @@ class LessonFormData {
     required this.isFree,
     required this.price,
     required this.learningMaterials,
+    required this.youtubePlaylistUrl,
     required this.publishAsActive,
   });
 
@@ -43,6 +44,7 @@ class LessonFormData {
   final bool isFree;
   final double? price;
   final List<String> learningMaterials;
+  final String? youtubePlaylistUrl;
   final bool publishAsActive;
 }
 
@@ -77,6 +79,7 @@ class LessonFormState extends State<LessonForm> {
   final _priceController = TextEditingController();
   final _outcomesController = TextEditingController();
   final _materialsController = TextEditingController();
+  final _youtubePlaylistController = TextEditingController();
 
   LessonCategory? _category;
   SkillLevel? _skillLevel;
@@ -147,6 +150,7 @@ class LessonFormState extends State<LessonForm> {
     _imageUrl = lesson.imageUrl;
     _outcomesController.text = lesson.learningOutcomes.join('\n');
     _materialsController.text = lesson.learningMaterials.join('\n');
+    _youtubePlaylistController.text = lesson.youtubePlaylistUrl ?? '';
     _selectedDays.addAll(lesson.availability.availableDays);
     if (!lesson.isFree && lesson.price != null) {
       _priceController.text = lesson.price!.toStringAsFixed(2);
@@ -162,6 +166,7 @@ class LessonFormState extends State<LessonForm> {
     _priceController.dispose();
     _outcomesController.dispose();
     _materialsController.dispose();
+    _youtubePlaylistController.dispose();
     super.dispose();
   }
 
@@ -206,6 +211,9 @@ class LessonFormState extends State<LessonForm> {
           .split('\n')
           .where((s) => s.isNotEmpty)
           .toList(),
+      youtubePlaylistUrl: _youtubePlaylistController.text.trim().isEmpty
+          ? null
+          : _youtubePlaylistController.text.trim(),
       publishAsActive: publishAsActive,
     );
   }
@@ -662,6 +670,34 @@ class LessonFormState extends State<LessonForm> {
                 alignLabelWithHint: true,
               ),
               maxLines: 3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            icon: Icons.video_library_outlined,
+            title: 'YouTube playlist',
+            subtitle: 'Optional videos learners can watch after enrolling.',
+            child: TextFormField(
+              controller: _youtubePlaylistController,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'YouTube playlist URL',
+                hintText: 'https://www.youtube.com/playlist?list=...',
+                helperText: 'Paste a public YouTube playlist link.',
+              ),
+              validator: (value) {
+                final url = value?.trim() ?? '';
+                if (url.isEmpty) return null;
+                final uri = Uri.tryParse(url);
+                final isYouTube = uri != null &&
+                    (uri.host == 'youtube.com' ||
+                        uri.host == 'www.youtube.com' ||
+                        uri.host == 'm.youtube.com');
+                if (!isYouTube || !uri.queryParameters.containsKey('list')) {
+                  return 'Enter a valid YouTube playlist URL.';
+                }
+                return null;
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -1162,6 +1198,7 @@ class LessonFormState extends State<LessonForm> {
           .toList(),
       exchangeType: data.exchangeType,
       learningMaterials: data.learningMaterials,
+      youtubePlaylistUrl: data.youtubePlaylistUrl,
       createdAt: createdAt ?? widget.initialLesson?.createdAt ?? now,
       updatedAt: now,
     );

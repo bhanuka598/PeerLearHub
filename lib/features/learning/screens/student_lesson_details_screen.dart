@@ -12,6 +12,7 @@ import '../../skill_provider/widgets/status_chip.dart';
 import '../data/student_lesson_store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
 
@@ -362,6 +363,16 @@ class _StudentLessonDetailsScreenState
                             ),
                           ),
                         ),
+                        if (_enrolled && _playlistId != null) ...[
+                          const SizedBox(height: 16),
+                          _sectionCard(
+                            icon: Icons.ondemand_video_outlined,
+                            title: 'Video lessons',
+                            child: _YoutubePlaylistPlayer(
+                              playlistId: _playlistId!,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _rateCard(),
                         const SizedBox(height: 16),
@@ -373,6 +384,12 @@ class _StudentLessonDetailsScreenState
               ],
             ),
     );
+  }
+
+  String? get _playlistId {
+    final url = lesson.youtubePlaylistUrl?.trim();
+    if (url == null || url.isEmpty) return null;
+    return Uri.tryParse(url)?.queryParameters['list'];
   }
 
   void _showReportDialog() {
@@ -759,6 +776,78 @@ class _StudentLessonDetailsScreenState
                   .map((review) => ReviewCard(review: review))
                   .toList(),
             ),
+    );
+  }
+}
+
+class _YoutubePlaylistPlayer extends StatefulWidget {
+  const _YoutubePlaylistPlayer({required this.playlistId});
+
+  final String playlistId;
+
+  @override
+  State<_YoutubePlaylistPlayer> createState() => _YoutubePlaylistPlayerState();
+}
+
+class _YoutubePlaylistPlayerState extends State<_YoutubePlaylistPlayer> {
+  late final YoutubePlayerController _controller;
+  bool _starting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = YoutubePlayerController(
+      params: const YoutubePlayerParams(
+        showControls: true,
+        showFullscreenButton: true,
+      ),
+    );
+    _controller.cuePlaylist(
+      list: [widget.playlistId],
+      listType: ListType.playlist,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.close();
+    super.dispose();
+  }
+
+  Future<void> _startPlaylist() async {
+    setState(() => _starting = true);
+    try {
+      await _controller.loadPlaylist(
+        list: [widget.playlistId],
+        listType: ListType.playlist,
+      );
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: YoutubePlayer(controller: _controller, aspectRatio: 16 / 9),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: _starting ? null : _startPlaylist,
+          icon: _starting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.play_arrow),
+          label: Text(_starting ? 'Starting playlist...' : 'Play video lessons'),
+        ),
+      ],
     );
   }
 }

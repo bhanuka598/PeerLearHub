@@ -1,18 +1,15 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:peer_learn_hub/core/auth/auth_service.dart';
 
 class AssignmentService {
   AssignmentService._();
 
   static final instance = AssignmentService._();
 
-  static String get _backendUrl {
-    const defaultUrl = 'http://localhost:4000';
-    return const String.fromEnvironment('BACKEND_URL', defaultValue: defaultUrl);
-  }
+  static String get _backendUrl => AuthService.backendBaseUrl;
 
   Future<void> submit({
     required String courseId,

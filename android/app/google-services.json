@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "536687852853-s4u8biq0aubj2fl89k2rdf27m5hinuh1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.peer_learn_hub",
+            "certificate_hash": "4286abe2d79b3a6a2d14567d81fa0114754c5ffc"
+          }
+        },
+        {
           "client_id": "536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com",
           "client_type": 3
         }

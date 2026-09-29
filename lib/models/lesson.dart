@@ -90,6 +90,7 @@ class Lesson {
     this.learningOutcomes = const [],
     this.exchangeType = ExchangeType.paid,
     this.learningMaterials = const [],
+    this.youtubePlaylistUrl,
   });
 
   final String id;
@@ -109,6 +110,7 @@ class Lesson {
   final List<String> learningOutcomes;
   final ExchangeType exchangeType;
   final List<String> learningMaterials;
+  final String? youtubePlaylistUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -130,6 +132,7 @@ class Lesson {
     List<String>? learningOutcomes,
     ExchangeType? exchangeType,
     List<String>? learningMaterials,
+    String? youtubePlaylistUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearPrice = false,
@@ -153,6 +156,7 @@ class Lesson {
       learningOutcomes: learningOutcomes ?? this.learningOutcomes,
       exchangeType: exchangeType ?? this.exchangeType,
       learningMaterials: learningMaterials ?? this.learningMaterials,
+      youtubePlaylistUrl: youtubePlaylistUrl ?? this.youtubePlaylistUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -177,6 +181,7 @@ class Lesson {
       'learningOutcomes': learningOutcomes,
       'exchangeType': exchangeType.name,
       'learningMaterials': learningMaterials,
+      'youtubePlaylistUrl': youtubePlaylistUrl,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -200,6 +205,7 @@ class Lesson {
       'learningOutcomes': learningOutcomes,
       'exchangeType': exchangeType.name,
       'learningMaterials': learningMaterials,
+      'youtubePlaylistUrl': youtubePlaylistUrl,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -230,6 +236,7 @@ class Lesson {
       ),
       learningMaterials:
           List<String>.from(map['learningMaterials'] as List? ?? []),
+      youtubePlaylistUrl: map['youtubePlaylistUrl'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
     );
@@ -278,6 +285,7 @@ class Lesson {
       ),
       learningMaterials:
           List<String>.from(data['learningMaterials'] as List? ?? []),
+      youtubePlaylistUrl: data['youtubePlaylistUrl'] as String?,
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
     );

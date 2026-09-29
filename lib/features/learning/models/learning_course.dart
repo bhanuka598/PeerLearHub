@@ -12,6 +12,20 @@ class CourseModule {
   final String duration;
 }
 
+class MiniVideoLesson {
+  const MiniVideoLesson({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.duration,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final String duration;
+}
+
 class LearningCourse {
   const LearningCourse({
     required this.id,
@@ -25,6 +39,7 @@ class LearningCourse {
     this.isInstructorVerified = false,
     required this.colorValue,
     required this.modules,
+    this.videoLessons = const [],
     this.enrolled = false,
     this.progress = 0,
   });
@@ -40,6 +55,7 @@ class LearningCourse {
   final bool isInstructorVerified;
   final int colorValue;
   final List<CourseModule> modules;
+  final List<MiniVideoLesson> videoLessons;
   final bool enrolled;
   final int progress;
 
@@ -55,6 +71,7 @@ class LearningCourse {
         isInstructorVerified: isInstructorVerified,
         colorValue: colorValue,
         modules: modules,
+        videoLessons: videoLessons,
         enrolled: enrolled ?? this.enrolled,
         progress: progress ?? this.progress,
       );

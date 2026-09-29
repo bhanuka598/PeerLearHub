@@ -12,8 +12,8 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-  } on UnsupportedError catch (_) {
-    // The UI can run while platform-specific Firebase configuration is added.
+  } catch (error, stackTrace) {
+    debugPrint('Firebase initialization error: $error\n$stackTrace');
   }
 
   SessionAutomationService.instance.start();

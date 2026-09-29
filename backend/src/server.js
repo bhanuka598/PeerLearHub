@@ -549,7 +549,7 @@ app.use((req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`PeerLearnHub backend listening on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`PeerLearnHub backend listening on http://0.0.0.0:${port} (and http://10.0.2.2:${port} for Android emulator)`);
   console.log(`Environment: ${process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 });

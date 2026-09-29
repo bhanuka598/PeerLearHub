@@ -160,6 +160,45 @@ const _modules = [
   ),
 ];
 
+const _flutterVideoLessons = [
+  MiniVideoLesson(
+    id: 'flutter_video_1',
+    title: 'Welcome to Flutter',
+    description: 'Understand Flutter, Dart, and how a Flutter app is structured.',
+    duration: '4 min',
+  ),
+  MiniVideoLesson(
+    id: 'flutter_video_2',
+    title: 'Create your first widget',
+    description: 'Build a simple screen with MaterialApp, Scaffold, and Text.',
+    duration: '6 min',
+  ),
+  MiniVideoLesson(
+    id: 'flutter_video_3',
+    title: 'Layout with Row and Column',
+    description: 'Arrange widgets and control spacing, alignment, and sizing.',
+    duration: '7 min',
+  ),
+  MiniVideoLesson(
+    id: 'flutter_video_4',
+    title: 'Respond to user input',
+    description: 'Use buttons and state to make your interface interactive.',
+    duration: '6 min',
+  ),
+  MiniVideoLesson(
+    id: 'flutter_video_5',
+    title: 'Navigate between screens',
+    description: 'Move between pages and pass information through your app.',
+    duration: '5 min',
+  ),
+  MiniVideoLesson(
+    id: 'flutter_video_6',
+    title: 'Mini project: profile card',
+    description: 'Combine the fundamentals to build a polished profile card.',
+    duration: '8 min',
+  ),
+];
+
 const _courses = [
   LearningCourse(
     id: 'flutter',
@@ -173,6 +212,7 @@ const _courses = [
     rating: 4.8,
     colorValue: 0xFF00695C,
     modules: _modules,
+    videoLessons: _flutterVideoLessons,
   ),
   LearningCourse(
     id: 'mern',

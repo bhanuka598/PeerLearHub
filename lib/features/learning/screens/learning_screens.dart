@@ -747,8 +747,14 @@ class LessonViewScreen extends StatefulWidget {
 
 class _LessonViewScreenState extends State<LessonViewScreen> {
   bool _playing = false;
+  int _selectedLesson = 0;
   final _message = TextEditingController();
   final List<String> _messages = ['Great explanation of widget composition!'];
+
+  List<MiniVideoLesson> get _lessons => widget.course.videoLessons;
+
+  MiniVideoLesson? get _currentLesson =>
+      _lessons.isEmpty ? null : _lessons[_selectedLesson];
 
   @override
   void dispose() {
@@ -758,14 +764,33 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lesson = _currentLesson;
+    final completedProgress = _lessons.isEmpty
+        ? 0
+        : (((_selectedLesson + 1) / _lessons.length) * 100).round();
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.course.modules[2].title),
+        title: Text(widget.course.title),
         actions: const [RoleSwitcherButton(), SizedBox(width: 4)],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Text(
+            'Course lessons',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _lessons.isEmpty
+                ? 'Lessons are being prepared.'
+                : 'Lesson ${_selectedLesson + 1} of ${_lessons.length}',
+            style: const TextStyle(color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 16),
           AspectRatio(
             aspectRatio: 16 / 9,
             child: DecoratedBox(
@@ -791,7 +816,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
                     left: 16,
                     right: 16,
                     child: LinearProgressIndicator(
-                      value: widget.course.progress / 100,
+                      value: completedProgress / 100,
                       color: AppTheme.primaryLight,
                       backgroundColor: Colors.white24,
                     ),
@@ -801,6 +826,54 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
             ),
           ),
           const SizedBox(height: 20),
+          if (lesson != null) ...[
+            Text(
+              lesson.title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${lesson.duration} · ${lesson.description}',
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (_lessons.isNotEmpty) ...[
+            Text(
+              'Up next',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...List.generate(_lessons.length, (index) {
+              final item = _lessons[index];
+              final selected = index == _selectedLesson;
+              return Card(
+                color: selected
+                    ? AppTheme.primaryColor.withValues(alpha: .10)
+                    : null,
+                child: ListTile(
+                  leading: CircleAvatar(child: Text('${index + 1}')),
+                  title: Text(item.title),
+                  subtitle: Text('${item.duration} · ${item.description}'),
+                  trailing: Icon(
+                    selected ? Icons.play_circle_fill : Icons.play_circle_outline,
+                    color: AppTheme.primaryColor,
+                  ),
+                  onTap: () => setState(() {
+                    _selectedLesson = index;
+                    _playing = false;
+                  }),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
           Text(
             'Discussion',
             style: Theme.of(context)
@@ -843,20 +916,29 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: FilledButton(
-            onPressed: () async {
-              await LearningStore.instance.updateProgress(
-                widget.course,
-                widget.course.progress + 5,
-              );
-              if (!context.mounted) {
-                return;
-              }
-              context.push(
-                '/learning/quiz',
-                extra: quizForModule(widget.course, 2),
-              );
-            },
-            child: const Text('Complete lesson and take quiz'),
+            onPressed: lesson == null
+                ? null
+                : () async {
+                    await LearningStore.instance.updateProgress(
+                      widget.course,
+                      completedProgress,
+                    );
+                    if (!context.mounted) {
+                      return;
+                    }
+                    context.push(
+                      '/learning/quiz',
+                      extra: quizForModule(
+                        widget.course,
+                        _selectedLesson % widget.course.modules.length,
+                      ),
+                    );
+                  },
+            child: Text(
+              lesson == null
+                  ? 'Course lessons coming soon'
+                  : 'Complete lesson and take quiz',
+            ),
           ),
         ),
       ),
