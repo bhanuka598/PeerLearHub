@@ -11,6 +11,7 @@ import '../../skill_provider/widgets/review_card.dart';
 import '../../skill_provider/widgets/status_chip.dart';
 import '../data/student_lesson_store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -42,6 +43,9 @@ class _StudentLessonDetailsScreenState
   bool _loading = true;
   bool _saving = false;
   bool _enrolled = false;
+  bool _quizCompleted = false;
+  int _currentVideoIndex = 0;
+  final Set<int> _completedVideoIndices = {};
 
   Lesson get lesson => _lesson;
 
@@ -72,6 +76,7 @@ class _StudentLessonDetailsScreenState
       _lesson = _mergeLesson(widget.lesson, fresh);
     }
     await _loadReviews();
+    await _loadVideoProgress();
   }
 
   Lesson _mergeLesson(Lesson passed, Lesson fetched) {
@@ -374,6 +379,10 @@ class _StudentLessonDetailsScreenState
                               rawUrl: lesson.youtubePlaylistUrl!,
                             ),
                           ),
+                        ],
+                        if (_enrolled) ...[
+                          const SizedBox(height: 16),
+                          _quizCheckpointCard(),
                         ],
                         const SizedBox(height: 16),
                         _rateCard(),
@@ -780,6 +789,338 @@ class _StudentLessonDetailsScreenState
             ),
     );
   }
+
+  Widget _quizCheckpointCard() {
+    return _playlistTrackerWidget();
+  }
+
+  List<PlaylistVideoItem> get _playlistVideos {
+    return [
+      PlaylistVideoItem(
+        id: 'v1',
+        title: '${lesson.title} - Part 1: Introduction',
+        duration: '5 min',
+        description: 'Introduction and fundamental concepts.',
+      ),
+      PlaylistVideoItem(
+        id: 'v2',
+        title: '${lesson.title} - Part 2: Core Walkthrough',
+        duration: '8 min',
+        description: 'Step-by-step practical demonstration.',
+      ),
+      PlaylistVideoItem(
+        id: 'v3',
+        title: '${lesson.title} - Part 3: Summary & Practice',
+        duration: '6 min',
+        description: 'Review, common pitfalls, and quiz practice.',
+      ),
+    ];
+  }
+
+  Future<void> _loadVideoProgress() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('enrollments')
+          .doc(lesson.id)
+          .get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data['completedVideos'] is List) {
+          setState(() {
+            _completedVideoIndices.clear();
+            _completedVideoIndices.addAll(
+              (data['completedVideos'] as List).map((e) => (e as num).toInt()),
+            );
+            if (_completedVideoIndices.isNotEmpty) {
+              _currentVideoIndex = (_completedVideoIndices.reduce((a, b) => a > b ? a : b) + 1)
+                  .clamp(0, _playlistVideos.length - 1);
+              if (_completedVideoIndices.length == _playlistVideos.length) {
+                _quizCompleted = true;
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading video progress: $e');
+    }
+  }
+
+  Future<void> _saveVideoProgress() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('enrollments')
+          .doc(lesson.id)
+          .set({
+            'completedVideos': _completedVideoIndices.toList(),
+            'lastVideoIndex': _currentVideoIndex,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error saving video progress: $e');
+    }
+  }
+
+  Future<void> _completeVideoQuiz(int videoIndex) async {
+    setState(() {
+      _completedVideoIndices.add(videoIndex);
+      if (videoIndex + 1 < _playlistVideos.length) {
+        _currentVideoIndex = videoIndex + 1;
+      }
+      if (_completedVideoIndices.length == _playlistVideos.length) {
+        _quizCompleted = true;
+      }
+    });
+    await _awardQuizPoints();
+    await _saveVideoProgress();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('🎉 Video ${videoIndex + 1} quiz passed! Earned +5 points. Next video unlocked!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Widget _playlistTrackerWidget() {
+    final videos = _playlistVideos;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.iconBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.playlist_play, color: AppTheme.primaryColor, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Playlist Progress (Video by Video)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${_completedVideoIndices.length}/${videos.length} Done',
+                style: const TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Watch each video in the playlist, complete its quiz to earn +5 points, and unlock the next video.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(videos.length, (index) {
+            final video = videos[index];
+            final isCompleted = _completedVideoIndices.contains(index);
+            final isCurrent = index == _currentVideoIndex && !isCompleted;
+            final isLocked = index > _currentVideoIndex && !isCompleted;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isCompleted
+                    ? Colors.green.shade50
+                    : (isCurrent ? AppTheme.primaryColor.withValues(alpha: 0.08) : Colors.grey.shade50),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isCompleted
+                      ? Colors.green.shade300
+                      : (isCurrent ? AppTheme.primaryColor : Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? Colors.green
+                          : (isCurrent ? AppTheme.primaryColor : Colors.grey.shade300),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isCompleted
+                          ? Icons.check
+                          : (isLocked ? Icons.lock : Icons.play_arrow),
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          video.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: isLocked ? Colors.grey : AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${video.duration} • ${video.description}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isLocked ? Colors.grey : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (isCompleted)
+                    const Chip(
+                      label: Text('+5 Pts', style: TextStyle(color: Colors.white, fontSize: 11)),
+                      backgroundColor: Colors.green,
+                      padding: EdgeInsets.zero,
+                    )
+                  else if (!isLocked)
+                    FilledButton.tonal(
+                      onPressed: () => _showVideoQuizDialog(index, video.title),
+                      child: const Text('Take Quiz'),
+                    )
+                  else
+                    const Icon(Icons.lock_outline, size: 20, color: Colors.grey),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _showVideoQuizDialog(int videoIndex, String videoTitle) {
+    int q1Answer = 0;
+    int q2Answer = 0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text('Quiz: $videoTitle'),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Complete this quick quiz for the video to earn +5 points and unlock the next video:',
+                      style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('1. What was the main takeaway of this video session?', style: TextStyle(fontWeight: FontWeight.bold)),
+                    RadioListTile<int>(
+                      title: Text('Understanding $videoTitle'),
+                      value: 0,
+                      groupValue: q1Answer,
+                      onChanged: (val) => setDialogState(() => q1Answer = val!),
+                    ),
+                    RadioListTile<int>(
+                      title: const Text('Unrelated concepts'),
+                      value: 1,
+                      groupValue: q1Answer,
+                      onChanged: (val) => setDialogState(() => q1Answer = val!),
+                    ),
+                    const Divider(),
+                    const Text('2. Are you ready to proceed to the next video?', style: TextStyle(fontWeight: FontWeight.bold)),
+                    RadioListTile<int>(
+                      title: const Text('Yes, ready to continue!'),
+                      value: 0,
+                      groupValue: q2Answer,
+                      onChanged: (val) => setDialogState(() => q2Answer = val!),
+                    ),
+                    RadioListTile<int>(
+                      title: const Text('Need to review again'),
+                      value: 1,
+                      groupValue: q2Answer,
+                      onChanged: (val) => setDialogState(() => q2Answer = val!),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _completeVideoQuiz(videoIndex);
+                },
+                child: const Text('Submit Quiz (+5 Pts)'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _awardQuizPoints() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'learningPoints': FieldValue.increment(5),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Could not award points: $e');
+    }
+  }
+}
+
+class PlaylistVideoItem {
+  const PlaylistVideoItem({
+    required this.id,
+    required this.title,
+    required this.duration,
+    required this.description,
+  });
+
+  final String id;
+  final String title;
+  final String duration;
+  final String description;
 }
 
 class ParsedYoutubeInfo {
