@@ -13,6 +13,7 @@ import '../data/student_lesson_store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
 
@@ -363,13 +364,14 @@ class _StudentLessonDetailsScreenState
                             ),
                           ),
                         ),
-                        if (_enrolled && _playlistId != null) ...[
+                        if (_enrolled && _parsedYoutube != null && _parsedYoutube!.isValid && lesson.youtubePlaylistUrl != null) ...[
                           const SizedBox(height: 16),
                           _sectionCard(
                             icon: Icons.ondemand_video_outlined,
                             title: 'Video lessons',
-                            child: _YoutubePlaylistPlayer(
-                              playlistId: _playlistId!,
+                            child: _YoutubeLessonPlayer(
+                              info: _parsedYoutube!,
+                              rawUrl: lesson.youtubePlaylistUrl!,
                             ),
                           ),
                         ],
@@ -386,10 +388,10 @@ class _StudentLessonDetailsScreenState
     );
   }
 
-  String? get _playlistId {
-    final url = lesson.youtubePlaylistUrl?.trim();
-    if (url == null || url.isEmpty) return null;
-    return Uri.tryParse(url)?.queryParameters['list'];
+  ParsedYoutubeInfo? get _parsedYoutube {
+    final url = lesson.youtubePlaylistUrl;
+    if (url == null) return null;
+    return parseYoutubeUrl(url);
   }
 
   void _showReportDialog() {
@@ -780,72 +782,198 @@ class _StudentLessonDetailsScreenState
   }
 }
 
-class _YoutubePlaylistPlayer extends StatefulWidget {
-  const _YoutubePlaylistPlayer({required this.playlistId});
+class ParsedYoutubeInfo {
+  const ParsedYoutubeInfo({
+    this.videoId,
+    this.playlistId,
+  });
 
-  final String playlistId;
+  final String? videoId;
+  final String? playlistId;
 
-  @override
-  State<_YoutubePlaylistPlayer> createState() => _YoutubePlaylistPlayerState();
+  bool get isValid => (videoId != null && videoId!.isNotEmpty) || (playlistId != null && playlistId!.isNotEmpty);
+  bool get isPlaylist => playlistId != null && playlistId!.isNotEmpty;
 }
 
-class _YoutubePlaylistPlayerState extends State<_YoutubePlaylistPlayer> {
-  late final YoutubePlayerController _controller;
-  bool _starting = false;
+ParsedYoutubeInfo? parseYoutubeUrl(String rawUrl) {
+  final url = rawUrl.trim();
+  if (url.isEmpty) return null;
+
+  final uri = Uri.tryParse(url);
+  if (uri != null && (uri.hasScheme || uri.host.isNotEmpty)) {
+    final listParam = uri.queryParameters['list'];
+    final vParam = uri.queryParameters['v'];
+
+    if (listParam != null && listParam.isNotEmpty) {
+      return ParsedYoutubeInfo(
+        playlistId: listParam,
+        videoId: vParam,
+      );
+    }
+
+    if (vParam != null && vParam.isNotEmpty) {
+      return ParsedYoutubeInfo(videoId: vParam);
+    }
+
+    if (uri.host.contains('youtu.be') && uri.pathSegments.isNotEmpty) {
+      return ParsedYoutubeInfo(videoId: uri.pathSegments.first);
+    }
+
+    if (uri.pathSegments.isNotEmpty) {
+      if (uri.pathSegments.contains('embed') || uri.pathSegments.contains('v')) {
+        final idx = uri.pathSegments.indexOf('embed');
+        if (idx != -1 && idx + 1 < uri.pathSegments.length) {
+          return ParsedYoutubeInfo(videoId: uri.pathSegments[idx + 1]);
+        }
+        final vIdx = uri.pathSegments.indexOf('v');
+        if (vIdx != -1 && vIdx + 1 < uri.pathSegments.length) {
+          return ParsedYoutubeInfo(videoId: uri.pathSegments[vIdx + 1]);
+        }
+      }
+
+      for (final segment in uri.pathSegments) {
+        if (segment.startsWith('PL') || segment.startsWith('UU') || segment.startsWith('LL') || segment.startsWith('RD')) {
+          return ParsedYoutubeInfo(playlistId: segment);
+        }
+        if (segment.length == 11) {
+          return ParsedYoutubeInfo(videoId: segment);
+        }
+      }
+    }
+  }
+
+  if (url.startsWith('PL') || url.startsWith('UU') || url.startsWith('LL') || url.startsWith('RD') || url.length > 12) {
+    return ParsedYoutubeInfo(playlistId: url);
+  }
+  if (url.length == 11) {
+    return ParsedYoutubeInfo(videoId: url);
+  }
+
+  return ParsedYoutubeInfo(videoId: url);
+}
+
+class _YoutubeLessonPlayer extends StatefulWidget {
+  const _YoutubeLessonPlayer({required this.info, required this.rawUrl});
+
+  final ParsedYoutubeInfo info;
+  final String rawUrl;
+
+  @override
+  State<_YoutubeLessonPlayer> createState() => _YoutubeLessonPlayerState();
+}
+
+class _YoutubeLessonPlayerState extends State<_YoutubeLessonPlayer> {
+  late final YoutubePlayerController? _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = YoutubePlayerController(
-      params: const YoutubePlayerParams(
-        showControls: true,
-        showFullscreenButton: true,
-      ),
-    );
-    _controller.cuePlaylist(
-      list: [widget.playlistId],
-      listType: ListType.playlist,
-    );
+    if (!widget.info.isPlaylist && widget.info.videoId != null) {
+      _controller = YoutubePlayerController(
+        params: const YoutubePlayerParams(
+          showControls: true,
+          showFullscreenButton: true,
+        ),
+      );
+      _controller!.cueVideoById(videoId: widget.info.videoId!);
+    } else {
+      _controller = null;
+    }
   }
 
   @override
   void dispose() {
-    _controller.close();
+    _controller?.close();
     super.dispose();
   }
 
-  Future<void> _startPlaylist() async {
-    setState(() => _starting = true);
-    try {
-      await _controller.loadPlaylist(
-        list: [widget.playlistId],
-        listType: ListType.playlist,
-      );
-    } finally {
-      if (mounted) setState(() => _starting = false);
+  Future<void> _launchExternal() async {
+    final uri = Uri.tryParse(widget.rawUrl);
+    if (uri != null) {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.info.isPlaylist) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.playlist_play, color: Colors.red, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'YouTube Video Playlist',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Watch this course playlist on YouTube.',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _launchExternal,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFF0000),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Open Playlist on YouTube'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: YoutubePlayer(controller: _controller, aspectRatio: 16 / 9),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _starting ? null : _startPlaylist,
-          icon: _starting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.play_arrow),
-          label: Text(_starting ? 'Starting playlist...' : 'Play video lessons'),
+        if (_controller != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: YoutubePlayer(controller: _controller!, aspectRatio: 16 / 9),
+          ),
+          const SizedBox(height: 12),
+        ],
+        OutlinedButton.icon(
+          onPressed: _launchExternal,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFFF0000),
+            side: const BorderSide(color: Color(0xFFFF0000)),
+          ),
+          icon: const Icon(Icons.open_in_new),
+          label: const Text('Watch on YouTube'),
         ),
       ],
     );
