@@ -556,7 +556,7 @@ app.post('/api/ai/recommendations', async (req, res) => {
     }
 
     const prompt = `
-You are an expert AI Learning Advisor. Analyze this learner's profile and recommend the top 2 courses from the provided list that best match their interests and learning goals.
+You are an expert AI Learning Advisor. Analyze this learner's profile, including their completed lessons/assignments in 'My lessons' (completedLessons) and enrolled courses (enrolledLessons), and recommend the top 2 courses from the provided list that best build upon their completed learning history, interests, and next steps in their learning path.
 
 Learner Profile:
 ${JSON.stringify(profile)}
@@ -568,7 +568,7 @@ Return ONLY a raw JSON array of objects with this format (no markdown code fence
 [
   {
     "courseId": "id_here",
-    "reasoning": "Personalized 1-2 sentence reason why this course matches their learning profile."
+    "reasoning": "Personalized 1-2 sentence reason referencing their completed lessons or learning history and why this next course matches them."
   }
 ]
 `;

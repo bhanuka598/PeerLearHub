@@ -72,6 +72,22 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (doc.exists) {
           learnerProfile.addAll(doc.data() ?? {});
         }
+
+        final assignmentsSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('assignments')
+            .get();
+        final completedLessonIds = assignmentsSnap.docs.map((d) => d.id).toList();
+        learnerProfile['completedLessons'] = completedLessonIds;
+
+        final enrollmentsSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('enrollments')
+            .get();
+        final enrolledLessonIds = enrollmentsSnap.docs.map((d) => d.id).toList();
+        learnerProfile['enrolledLessons'] = enrolledLessonIds;
       } catch (e) {
         debugPrint('Error loading learner profile: $e');
       }
