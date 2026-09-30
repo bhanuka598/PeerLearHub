@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
@@ -1197,13 +1198,31 @@ class _StudentLessonDetailsScreenState
                     ],
                   ),
                   const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _downloadCertificate,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                    ),
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Download Certificate (PDF)'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _downloadCertificate,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                          ),
+                          icon: const Icon(Icons.picture_as_pdf),
+                          label: const Text('Download PDF'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _saveCertificateToFile,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryColor,
+                            side: const BorderSide(color: AppTheme.primaryColor),
+                          ),
+                          icon: const Icon(Icons.save_alt),
+                          label: const Text('Save to Files'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1299,6 +1318,24 @@ class _StudentLessonDetailsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not download certificate: $e')),
       );
+    }
+  }
+
+  Future<void> _saveCertificateToFile() async {
+    try {
+      final bytes = await _generateCertificateBytes();
+      String? outputFile = await FilePicker.saveFile(
+        dialogTitle: 'Save Certificate PDF',
+        fileName: 'peerlearnhub-lesson-${lesson.id}-certificate.pdf',
+        bytes: bytes,
+      );
+      if (outputFile != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Certificate saved to $outputFile')),
+        );
+      }
+    } catch (e) {
+      await _downloadCertificate();
     }
   }
 
