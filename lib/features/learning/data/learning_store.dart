@@ -53,9 +53,12 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
           );
         }).toList();
         value = loaded;
+      } else {
+        value = [];
       }
     } catch (e) {
       debugPrint('Could not load courses: $e');
+      value = [];
     }
   }
 

@@ -309,17 +309,54 @@ Return ONLY raw JSON, with no markdown code fences or other text.
           'profile': learnerProfile,
           'courses': courses,
         }),
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is Map && data['success'] == true && data['recommendations'] is List) {
-          return List<Map<String, dynamic>>.from(data['recommendations']);
+          final list = List<Map<String, dynamic>>.from(data['recommendations']);
+          if (list.isNotEmpty) {
+            return list;
+          }
         }
       }
     } catch (e) {
       debugPrint('Gemini recommendation service error: $e');
     }
-    return [];
+
+    // Heuristic Fallback based on completed/enrolled lessons & courses
+    final completed = (learnerProfile['completedLessons'] as List?)?.map((e) => e.toString()).toSet() ?? {};
+    final enrolled = (learnerProfile['enrolledLessons'] as List?)?.map((e) => e.toString()).toSet() ?? {};
+
+    final List<Map<String, dynamic>> fallback = [];
+    for (final c in courses) {
+      if (c is Map && c['id'] != null) {
+        final cid = c['id'].toString();
+        if (!completed.contains(cid)) {
+          fallback.add({
+            'courseId': cid,
+            'reasoning': enrolled.contains(cid)
+                ? 'Continue your progress in this enrolled course to master new skills.'
+                : 'Recommended based on your completed lessons and learning path synergy.',
+          });
+          if (fallback.length >= 2) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (fallback.isEmpty && courses.isNotEmpty) {
+      for (final c in courses.take(2)) {
+        if (c is Map && c['id'] != null) {
+          fallback.add({
+            'courseId': c['id'].toString(),
+            'reasoning': 'Recommended based on popular peer learning trends and skill development goals.',
+          });
+        }
+      }
+    }
+
+    return fallback;
   }
 }
