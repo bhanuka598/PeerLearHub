@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:typed_data';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../core/auth/app_auth.dart';
 import '../../../core/theme/app_theme.dart';
@@ -713,6 +716,48 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
     );
   }
 
+  Future<void> _downloadCertificateForCourse(LearningCourse course) async {
+    try {
+      final document = pw.Document();
+      document.addPage(
+        pw.Page(
+          build: (context) => pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text(
+                  'CERTIFICATE OF COMPLETION',
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('This certifies that the learner successfully completed'),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  course.title,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('Awarded by PeerLearnHub System'),
+                pw.SizedBox(height: 8),
+                pw.Text('Date: ${DateTime.now().toLocal().toString().split(' ')[0]}'),
+              ],
+            ),
+          ),
+        ),
+      );
+      final bytes = await document.save();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'peerlearnhub-course-${course.id}-certificate.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download certificate: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<LearningCourse>>(
@@ -821,7 +866,23 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
                                     extra: course,
                                   ),
                                 ),
-                                if (LearningStore.instance
+                                if (course.progress >= 100)
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 16),
+                                      child: FilledButton.icon(
+                                        onPressed: () => _downloadCertificateForCourse(course),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                        ),
+                                        icon: const Icon(Icons.workspace_premium),
+                                        label: const Text('Download Certificate (PDF)'),
+                                      ),
+                                    ),
+                                  )
+                                else if (LearningStore.instance
                                     .canSubmitAssignment(course))
                                   Align(
                                     alignment: Alignment.centerRight,
@@ -1707,7 +1768,7 @@ class _MyLearningEmptyState extends StatelessWidget {
   }
 }
 
-class _EnrolledLessonCard extends StatelessWidget {
+class _EnrolledLessonCard extends StatefulWidget {
   const _EnrolledLessonCard({
     required this.lesson,
     required this.onOpen,
@@ -1721,6 +1782,79 @@ class _EnrolledLessonCard extends StatelessWidget {
   final ProviderSession? nextSession;
 
   @override
+  State<_EnrolledLessonCard> createState() => _EnrolledLessonCardState();
+}
+
+class _EnrolledLessonCardState extends State<_EnrolledLessonCard> {
+  bool _isCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCompletion();
+  }
+
+  Future<void> _checkCompletion() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('assignments')
+          .doc(widget.lesson.id)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() => _isCompleted = true);
+      }
+    } catch (e) {
+      debugPrint('Error checking lesson completion: $e');
+    }
+  }
+
+  Future<void> _downloadCertificate() async {
+    try {
+      final document = pw.Document();
+      document.addPage(
+        pw.Page(
+          build: (context) => pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text(
+                  'CERTIFICATE OF COMPLETION',
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('This certifies that the learner successfully completed'),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  widget.lesson.title,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('Awarded by PeerLearnHub System'),
+                pw.SizedBox(height: 8),
+                pw.Text('Date: ${DateTime.now().toLocal().toString().split(' ')[0]}'),
+              ],
+            ),
+          ),
+        ),
+      );
+      final bytes = await document.save();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'peerlearnhub-lesson-${widget.lesson.id}-certificate.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download certificate: $e')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1729,7 +1863,7 @@ class _EnrolledLessonCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onOpen,
+          onTap: widget.onOpen,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -1739,24 +1873,48 @@ class _EnrolledLessonCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _CatalogThumb(
-                      image: lessonImageProvider(lesson.imageUrl),
-                      icon: _categoryIcon(lesson.category.label),
+                      image: lessonImageProvider(widget.lesson.imageUrl),
+                      icon: _categoryIcon(widget.lesson.category.label),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            lesson.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              height: 1.25,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.lesson.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (_isCompleted) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade100,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Completed',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -1764,16 +1922,16 @@ class _EnrolledLessonCard extends StatelessWidget {
                             runSpacing: 6,
                             children: [
                               _InfoChip(
-                                icon: _categoryIcon(lesson.category.label),
-                                label: lesson.category.label,
+                                icon: _categoryIcon(widget.lesson.category.label),
+                                label: widget.lesson.category.label,
                               ),
-                              _InfoChip(label: lesson.skillLevel.label),
+                              _InfoChip(label: widget.lesson.skillLevel.label),
                             ],
                           ),
-                          if (nextSession != null) ...[
+                          if (widget.nextSession != null) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Next session · ${formatDateTime(nextSession!.scheduledAt)}',
+                              'Next session · ${formatDateTime(widget.nextSession!.scheduledAt)}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -1789,7 +1947,7 @@ class _EnrolledLessonCard extends StatelessWidget {
                     PopupMenuButton<String>(
                       tooltip: 'Lesson options',
                       onSelected: (value) {
-                        if (value == 'remove') onRemove();
+                        if (value == 'remove') widget.onRemove();
                       },
                       itemBuilder: (context) => const [
                         PopupMenuItem(
@@ -1801,12 +1959,28 @@ class _EnrolledLessonCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.tonal(
-                    onPressed: onOpen,
-                    child: const Text('Continue'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonal(
+                        onPressed: widget.onOpen,
+                        child: const Text('Continue'),
+                      ),
+                    ),
+                    if (_isCompleted) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _downloadCertificate,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          icon: const Icon(Icons.workspace_premium, size: 18),
+                          label: const Text('Certificate'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
