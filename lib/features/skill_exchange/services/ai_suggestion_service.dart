@@ -295,4 +295,31 @@ Return ONLY raw JSON, with no markdown code fences or other text.
     }
     return false;
   }
+
+  static Future<List<Map<String, dynamic>>> getPersonalizedRecommendations({
+    required Map<String, dynamic> learnerProfile,
+    required List<dynamic> courses,
+  }) async {
+    try {
+      final backendUri = Uri.parse('${AuthService.backendBaseUrl}/api/ai/recommendations');
+      final response = await http.post(
+        backendUri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'profile': learnerProfile,
+          'courses': courses,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['success'] == true && data['recommendations'] is List) {
+          return List<Map<String, dynamic>>.from(data['recommendations']);
+        }
+      }
+    } catch (e) {
+      debugPrint('Gemini recommendation service error: $e');
+    }
+    return [];
+  }
 }

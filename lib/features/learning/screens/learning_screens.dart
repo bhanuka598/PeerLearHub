@@ -21,6 +21,8 @@ import '../models/learning_course.dart';
 import '../models/learning_quiz.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../skill_exchange/services/ai_suggestion_service.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -37,6 +39,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _loadingLessons = true;
 
   static const _levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
+  List<Map<String, dynamic>> _aiRecommendations = [];
+  bool _loadingAiRecommendations = true;
 
   @override
   void initState() {
@@ -46,7 +50,49 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     StudentLessonStore.instance.load();
     ReviewService.instance.refresh();
     _loadTeacherLessons();
-    LearningStore.instance.loadEnrollments();
+    LearningStore.instance.loadEnrollments().then((_) {
+      _loadAiRecommendations(LearningStore.instance.value);
+    });
+  }
+
+  Future<void> _loadAiRecommendations(List<LearningCourse> courses) async {
+    final user = FirebaseAuth.instance.currentUser;
+    Map<String, dynamic> learnerProfile = {
+      'uid': user?.uid ?? 'guest',
+      'email': user?.email ?? '',
+      'displayName': user?.displayName ?? 'Learner',
+    };
+
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          learnerProfile.addAll(doc.data() ?? {});
+        }
+      } catch (e) {
+        debugPrint('Error loading learner profile: $e');
+      }
+    }
+
+    final courseDataList = courses.map((c) => {
+      'id': c.id,
+      'title': c.title,
+      'category': c.category,
+      'level': c.level,
+      'tags': c.modules.map((m) => m.title).toList(),
+    }).toList();
+
+    final recs = await AISuggestionService.getPersonalizedRecommendations(
+      learnerProfile: learnerProfile,
+      courses: courseDataList,
+    );
+
+    if (mounted) {
+      setState(() {
+        _aiRecommendations = recs;
+        _loadingAiRecommendations = false;
+      });
+    }
   }
 
   @override
@@ -251,6 +297,82 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               ),
                             ),
                           ),
+                        const SizedBox(height: 24),
+                        const _DiscoverSectionHeader(
+                          title: '✨ Recommended For You',
+                          subtitle: 'Personalized based on your learner profile & goals',
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loadingAiRecommendations)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          )
+                        else if (_aiRecommendations.isEmpty)
+                          const Text(
+                            'Complete your profile and enroll in courses to get AI-powered recommendations.',
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          )
+                        else
+                          ..._aiRecommendations.map((rec) {
+                            final courseId = rec['courseId']?.toString();
+                            final reasoning = rec['reasoning']?.toString() ?? '';
+                            final course = courses.firstWhere(
+                              (c) => c.id == courseId,
+                              orElse: () => courses.first,
+                            );
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.auto_awesome, color: AppTheme.primaryColor, size: 20),
+                                      const SizedBox(width: 8),
+                                      const Expanded(
+                                        child: Text(
+                                          'AI Match Reason',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.primaryColor,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    reasoning,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  CourseCard(
+                                    course: course,
+                                    onTap: () => context.push(
+                                      '/learning/course',
+                                      extra: course,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                         const SizedBox(height: 24),
                         _DiscoverSectionHeader(
                           title: 'Popular courses',

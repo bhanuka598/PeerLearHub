@@ -542,6 +542,72 @@ app.post('/api/ai/match-suggestions', async (req, res) => {
   }
 });
 
+// AI Personalized Course Recommendations endpoint
+app.post('/api/ai/recommendations', async (req, res) => {
+  try {
+    const { profile, courses } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'GEMINI_API_KEY is not configured in backend .env',
+      });
+    }
+
+    const prompt = `
+You are an expert AI Learning Advisor. Analyze this learner's profile and recommend the top 2 courses from the provided list that best match their interests and learning goals.
+
+Learner Profile:
+${JSON.stringify(profile)}
+
+Available Courses:
+${JSON.stringify(courses)}
+
+Return ONLY a raw JSON array of objects with this format (no markdown code fences):
+[
+  {
+    "courseId": "id_here",
+    "reasoning": "Personalized 1-2 sentence reason why this course matches their learning profile."
+  }
+]
+`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini recommendations API error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed = [];
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('Failed to parse Gemini recommendation JSON:', cleanJson);
+    }
+
+    return res.json({ success: true, recommendations: parsed });
+  } catch (error) {
+    console.error('AI recommendation error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
