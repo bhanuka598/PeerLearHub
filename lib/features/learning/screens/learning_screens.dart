@@ -46,6 +46,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _loadingAiRecommendations = true;
   Map<String, dynamic>? _skillGapData;
   bool _loadingSkillGap = true;
+  String _trendingSort = 'Trending'; // 'Trending', 'Most Enrolled', 'Highest Rated', 'Newest'
 
   @override
   void initState() {
@@ -389,6 +390,35 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     _matchesSearch(course),
               )
               .toList();
+
+          // Sort by Enrollments, Ratings, Recency
+          visibleCourses.sort((a, b) {
+            if (_trendingSort == 'Most Enrolled') {
+              return b.enrollmentCount.compareTo(a.enrollmentCount);
+            } else if (_trendingSort == 'Highest Rated') {
+              return b.rating.compareTo(a.rating);
+            } else if (_trendingSort == 'Newest') {
+              final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            } else {
+              // 'Trending' Hybrid Score: Enrollments (50%) + Ratings (30%) + Recency (20%)
+              final aEnrollScore = a.enrollmentCount * 10.0;
+              final bEnrollScore = b.enrollmentCount * 10.0;
+              final aRatingScore = a.rating * 15.0;
+              final bRatingScore = b.rating * 15.0;
+              final now = DateTime.now();
+              final aAgeDays = a.createdAt != null ? now.difference(a.createdAt!).inDays : 60;
+              final bAgeDays = b.createdAt != null ? now.difference(b.createdAt!).inDays : 60;
+              final aRecencyScore = (30.0 - aAgeDays.clamp(0, 30)).toDouble();
+              final bRecencyScore = (30.0 - bAgeDays.clamp(0, 30)).toDouble();
+
+              final aScore = aEnrollScore + aRatingScore + aRecencyScore;
+              final bScore = bEnrollScore + bRatingScore + bRecencyScore;
+              return bScore.compareTo(aScore);
+            }
+          });
+
           final teacherLessons = _visibleTeacherLessonsFor(selectedCategory);
           return Scaffold(
             backgroundColor: AppTheme.backgroundColor,
@@ -1004,11 +1034,55 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             );
                           }),
                         const SizedBox(height: 24),
-                        _DiscoverSectionHeader(
-                          title: 'Popular courses',
-                          subtitle: visibleCourses.isEmpty
-                              ? 'Self-paced learning paths'
-                              : '${visibleCourses.length} to explore',
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Expanded(
+                              child: _DiscoverSectionHeader(
+                                title: '🔥 Trending & Popular Courses',
+                                subtitle: 'What local learners are taking right now',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // Filter Pills for Trending Criteria
+                        SizedBox(
+                          height: 36,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              'Trending',
+                              'Most Enrolled',
+                              'Highest Rated',
+                              'Newest',
+                            ].map((sortOption) {
+                              final isSelected = _trendingSort == sortOption;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (sortOption == 'Trending')
+                                        const Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.deepOrange),
+                                      if (sortOption == 'Most Enrolled')
+                                        const Icon(Icons.people_alt_rounded, size: 14, color: Colors.blue),
+                                      if (sortOption == 'Highest Rated')
+                                        const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                                      if (sortOption == 'Newest')
+                                        const Icon(Icons.access_time_rounded, size: 14, color: Colors.teal),
+                                      const SizedBox(width: 4),
+                                      Text(sortOption, style: const TextStyle(fontSize: 12)),
+                                    ],
+                                  ),
+                                  selected: isSelected,
+                                  selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                                  onSelected: (_) => setState(() => _trendingSort = sortOption),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         if (visibleCourses.isEmpty)
@@ -2299,6 +2373,29 @@ class CourseCard extends StatelessWidget {
                             label: course.category,
                           ),
                           _InfoChip(label: course.level),
+                          if (course.enrollmentCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.local_fire_department_rounded, color: Colors.deepOrange, size: 12),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${course.enrollmentCount} local ${course.enrollmentCount == 1 ? 'learner' : 'learners'}',
+                                    style: const TextStyle(
+                                      color: Colors.deepOrange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 10),

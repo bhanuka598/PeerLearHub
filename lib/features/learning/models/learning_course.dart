@@ -42,6 +42,8 @@ class LearningCourse {
     this.videoLessons = const [],
     this.enrolled = false,
     this.progress = 0,
+    this.enrollmentCount = 0,
+    this.createdAt,
   });
 
   final String id;
@@ -58,8 +60,15 @@ class LearningCourse {
   final List<MiniVideoLesson> videoLessons;
   final bool enrolled;
   final int progress;
+  final int enrollmentCount;
+  final DateTime? createdAt;
 
-  LearningCourse copyWith({bool? enrolled, int? progress}) => LearningCourse(
+  LearningCourse copyWith({
+    bool? enrolled,
+    int? progress,
+    int? enrollmentCount,
+    DateTime? createdAt,
+  }) => LearningCourse(
         id: id,
         title: title,
         description: description,
@@ -74,5 +83,7 @@ class LearningCourse {
         videoLessons: videoLessons,
         enrolled: enrolled ?? this.enrolled,
         progress: progress ?? this.progress,
+        enrollmentCount: enrollmentCount ?? this.enrollmentCount,
+        createdAt: createdAt ?? this.createdAt,
       );
 }

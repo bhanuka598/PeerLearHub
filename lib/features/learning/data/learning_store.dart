@@ -37,6 +37,14 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
             duration: v['duration']?.toString() ?? '5 min',
           )).toList();
 
+          final rawCreated = data['createdAt'];
+          DateTime? createdAt;
+          if (rawCreated is Timestamp) {
+            createdAt = rawCreated.toDate();
+          } else if (rawCreated is String) {
+            createdAt = DateTime.tryParse(rawCreated);
+          }
+
           return LearningCourse(
             id: doc.id,
             title: data['title']?.toString() ?? '',
@@ -50,6 +58,8 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
             colorValue: (data['colorValue'] as num?)?.toInt() ?? 0xFF00695C,
             modules: modules,
             videoLessons: videoLessons,
+            enrollmentCount: (data['enrollmentCount'] as num?)?.toInt() ?? 0,
+            createdAt: createdAt,
           );
         }).toList();
         value = loaded;
@@ -161,6 +171,15 @@ class LearningStore extends ValueNotifier<List<LearningCourse>> {
             'progress': course.progress,
             'enrolledAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+      // Increment course global enrollment counter
+      await FirebaseFirestore.instance
+          .collection('courses')
+          .doc(course.id)
+          .set({
+            'enrollmentCount': FieldValue.increment(1),
+            'lastEnrolledAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     } on FirebaseException catch (error) {
       debugPrint('Could not save enrollment: ${error.code}');
