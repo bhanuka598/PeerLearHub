@@ -836,7 +836,8 @@ class _StudentLessonDetailsScreenState
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
-      final doc = await FirebaseFirestore.instance
+      final db = FirebaseFirestore.instance;
+      final doc = await db
           .collection('users')
           .doc(user.uid)
           .collection('enrollments')
@@ -859,6 +860,19 @@ class _StudentLessonDetailsScreenState
             }
           });
         }
+      }
+
+      final assignmentDoc = await db
+          .collection('users')
+          .doc(user.uid)
+          .collection('assignments')
+          .doc(lesson.id)
+          .get();
+      if (assignmentDoc.exists) {
+        setState(() {
+          _assignmentSubmitted = true;
+          _quizCompleted = true;
+        });
       }
     } catch (e) {
       debugPrint('Error loading video progress: $e');

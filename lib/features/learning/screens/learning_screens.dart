@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:typed_data';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../core/auth/app_auth.dart';
 import '../../../core/theme/app_theme.dart';
@@ -21,6 +24,8 @@ import '../models/learning_course.dart';
 import '../models/learning_quiz.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../skill_exchange/services/ai_suggestion_service.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -37,6 +42,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _loadingLessons = true;
 
   static const _levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
+  List<Map<String, dynamic>> _aiRecommendations = [];
+  bool _loadingAiRecommendations = true;
+  Map<String, dynamic>? _skillGapData;
+  bool _loadingSkillGap = true;
+  String _trendingSort = 'Trending'; // 'Trending', 'Most Enrolled', 'Highest Rated', 'Newest'
 
   @override
   void initState() {
@@ -46,7 +56,119 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     StudentLessonStore.instance.load();
     ReviewService.instance.refresh();
     _loadTeacherLessons();
-    LearningStore.instance.loadEnrollments();
+    LearningStore.instance.loadEnrollments().then((_) {
+      _loadAiRecommendations(LearningStore.instance.value);
+    });
+  }
+
+  List<String> _userInterests = [];
+  String _userGoal = '';
+  String _userSkillLevel = 'Beginner';
+  List<String> _userSearchHistory = [];
+
+  Future<void> _recordSearchQuery(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        await userRef.set({
+          'searchHistory': FieldValue.arrayUnion([trimmed.toLowerCase()]),
+          'lastSearchedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        if (!_userSearchHistory.contains(trimmed.toLowerCase())) {
+          _userSearchHistory.insert(0, trimmed.toLowerCase());
+          if (_userSearchHistory.length > 8) _userSearchHistory.removeLast();
+        }
+      } catch (e) {
+        debugPrint('Error recording search query: $e');
+      }
+    }
+    // Re-trigger personalized recommendations with updated search signal
+    _loadAiRecommendations(LearningStore.instance.value);
+  }
+
+  Future<void> _loadAiRecommendations(List<LearningCourse> courses) async {
+    final user = FirebaseAuth.instance.currentUser;
+    Map<String, dynamic> learnerProfile = {
+      'uid': user?.uid ?? 'guest',
+      'email': user?.email ?? '',
+      'displayName': user?.displayName ?? 'Learner',
+      'learningGoal': _userGoal,
+      'skillLevel': _userSkillLevel,
+      'interests': _userInterests,
+      'searchHistory': _userSearchHistory,
+    };
+
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          final data = doc.data() ?? {};
+          learnerProfile.addAll(data);
+          _userGoal = (data['learningGoal'] ?? data['goal'] ?? '').toString();
+          _userSkillLevel = (data['skillLevel'] ?? data['level'] ?? 'Beginner').toString();
+          _userInterests = (data['interests'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          _userSearchHistory = (data['searchHistory'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        }
+
+        final assignmentsSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('assignments')
+            .get();
+        final completedLessonIds = assignmentsSnap.docs.map((d) => d.id).toList();
+        learnerProfile['completedLessons'] = completedLessonIds;
+
+        final enrollmentsSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('enrollments')
+            .get();
+        final enrolledLessonIds = enrollmentsSnap.docs.map((d) => d.id).toList();
+        learnerProfile['enrolledLessons'] = enrolledLessonIds;
+      } catch (e) {
+        debugPrint('Error loading learner profile: $e');
+      }
+    }
+
+    final courseDataList = courses.map((c) => {
+      'id': c.id,
+      'title': c.title,
+      'category': c.category,
+      'level': c.level,
+      'tags': c.modules.map((m) => m.title).toList(),
+    }).toList();
+
+    final recs = await AISuggestionService.getPersonalizedRecommendations(
+      learnerProfile: learnerProfile,
+      courses: courseDataList,
+    );
+
+    // Load Skill-Gap recommendations for target role vs current skills & completed courses
+    final targetRole = _userGoal.isNotEmpty ? _userGoal : 'Mobile Developer';
+    final completedCourseObjs = courses.where((c) => (learnerProfile['completedLessons'] as List? ?? []).contains(c.id)).map((c) => {
+      'id': c.id,
+      'title': c.title,
+      'category': c.category,
+    }).toList();
+
+    final gapResult = await AISuggestionService.getSkillGapRecommendations(
+      targetRole: targetRole,
+      currentSkills: _userInterests,
+      completedCourses: completedCourseObjs,
+      candidateCourses: courseDataList,
+    );
+
+    if (mounted) {
+      setState(() {
+        _aiRecommendations = recs;
+        _loadingAiRecommendations = false;
+        _skillGapData = gapResult;
+        _loadingSkillGap = false;
+      });
+    }
   }
 
   @override
@@ -115,6 +237,129 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }).toList();
   }
 
+  void _showPreferenceTunerDialog() {
+    final goalController = TextEditingController(text: _userGoal);
+    String selectedLevel = _userSkillLevel;
+    final Set<String> currentInterests = Set<String>.from(_userInterests);
+    const availableInterests = [
+      'Mobile Development',
+      'Flutter',
+      'Python',
+      'UI/UX Design',
+      'Web Development',
+      'Cloud & DevOps',
+      'Cyber Security',
+      'Artificial Intelligence',
+      'Data Science',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.tune_rounded, color: AppTheme.primaryColor),
+                SizedBox(width: 8),
+                Text('Customize My Learning', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Learning Goal / Career Ambition', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: goalController,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. Become a Mobile Developer',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Your Current Skill Level', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: ['Beginner', 'Intermediate', 'Advanced'].contains(selectedLevel) ? selectedLevel : 'Beginner',
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: ['Beginner', 'Intermediate', 'Advanced']
+                        .map((lvl) => DropdownMenuItem(value: lvl, child: Text(lvl)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedLevel = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Topic Interests', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: availableInterests.map((interest) {
+                      final isSelected = currentInterests.contains(interest);
+                      return FilterChip(
+                        label: Text(interest, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : AppTheme.textPrimary)),
+                        selected: isSelected,
+                        selectedColor: AppTheme.primaryColor,
+                        checkmarkColor: Colors.white,
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              currentInterests.add(interest);
+                            } else {
+                              currentInterests.remove(interest);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final newGoal = goalController.text.trim();
+                  Navigator.pop(ctx);
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                      'learningGoal': newGoal,
+                      'skillLevel': selectedLevel,
+                      'interests': currentInterests.toList(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+                  }
+                  if (mounted) {
+                    setState(() {
+                      _userGoal = newGoal;
+                      _userSkillLevel = selectedLevel;
+                      _userInterests = currentInterests.toList();
+                    });
+                    _loadAiRecommendations(LearningStore.instance.value);
+                  }
+                },
+                child: const Text('Save & Update Feed'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   String get _firstName {
     final name = FirebaseAuth.instance.currentUser?.displayName?.trim();
     if (name == null || name.isEmpty) return '';
@@ -145,6 +390,35 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     _matchesSearch(course),
               )
               .toList();
+
+          // Sort by Enrollments, Ratings, Recency
+          visibleCourses.sort((a, b) {
+            if (_trendingSort == 'Most Enrolled') {
+              return b.enrollmentCount.compareTo(a.enrollmentCount);
+            } else if (_trendingSort == 'Highest Rated') {
+              return b.rating.compareTo(a.rating);
+            } else if (_trendingSort == 'Newest') {
+              final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            } else {
+              // 'Trending' Hybrid Score: Enrollments (50%) + Ratings (30%) + Recency (20%)
+              final aEnrollScore = a.enrollmentCount * 10.0;
+              final bEnrollScore = b.enrollmentCount * 10.0;
+              final aRatingScore = a.rating * 15.0;
+              final bRatingScore = b.rating * 15.0;
+              final now = DateTime.now();
+              final aAgeDays = a.createdAt != null ? now.difference(a.createdAt!).inDays : 60;
+              final bAgeDays = b.createdAt != null ? now.difference(b.createdAt!).inDays : 60;
+              final aRecencyScore = (30.0 - aAgeDays.clamp(0, 30)).toDouble();
+              final bRecencyScore = (30.0 - bAgeDays.clamp(0, 30)).toDouble();
+
+              final aScore = aEnrollScore + aRatingScore + aRecencyScore;
+              final bScore = bEnrollScore + bRatingScore + bRecencyScore;
+              return bScore.compareTo(aScore);
+            }
+          });
+
           final teacherLessons = _visibleTeacherLessonsFor(selectedCategory);
           return Scaffold(
             backgroundColor: AppTheme.backgroundColor,
@@ -167,6 +441,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       searchController: _searchController,
                       onQueryChanged: (value) =>
                           setState(() => _query = value),
+                      onSubmitted: (value) => _recordSearchQuery(value),
                       onProfile: () => context.go('/profile'),
                       onLogout: () {
                         AppAuth.instance.logout();
@@ -178,6 +453,145 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
+                        // Personalized Learner Goal & Interests Summary Banner
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.track_changes_rounded,
+                                      color: AppTheme.primaryColor,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Personalized For You',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          _userGoal.isNotEmpty
+                                              ? 'Goal: $_userGoal • Level: $_userSkillLevel'
+                                              : 'Set your learning goal to get tailored courses',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    ),
+                                    onPressed: _showPreferenceTunerDialog,
+                                    icon: const Icon(Icons.tune_rounded, size: 16),
+                                    label: const Text('Edit Goal', style: TextStyle(fontSize: 12)),
+                                  ),
+                                ],
+                              ),
+                              if (_userInterests.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: _userInterests.map((interest) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '#$interest',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primaryColor,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                              if (_userSearchHistory.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.history_rounded, size: 14, color: AppTheme.textSecondary),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Recent searches: ',
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                    ),
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
+                                          children: _userSearchHistory.take(3).map((term) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(right: 6),
+                                              child: InkWell(
+                                                onTap: () {
+                                                  _searchController.text = term;
+                                                  setState(() => _query = term);
+                                                },
+                                                child: Text(
+                                                  '"$term"',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppTheme.primaryColor,
+                                                    decoration: TextDecoration.underline,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                         const _DiscoverSectionHeader(
                           title: 'Categories',
                           subtitle: 'Filter by what you want to learn',
@@ -252,11 +666,423 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             ),
                           ),
                         const SizedBox(height: 24),
+                        const _DiscoverSectionHeader(
+                          title: '✨ Personalized Course Feed',
+                          subtitle: 'Courses matching your goal, skill level, and interests',
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loadingAiRecommendations)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          )
+                        else if (_aiRecommendations.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: AppTheme.textSecondary),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Set your learning goals and search for topics to view tailored course suggestions.',
+                                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ..._aiRecommendations.map((rec) {
+                            final courseId = rec['courseId']?.toString();
+                            final reasoning = rec['reasoning']?.toString() ?? '';
+                            final matchScore = rec['matchScore'] ?? 85;
+                            final section = rec['section']?.toString() ?? 'goal';
+                            final course = courses.firstWhere(
+                              (c) => c.id == courseId,
+                              orElse: () => courses.first,
+                            );
+
+                            String badgeText = 'Top Goal Match';
+                            IconData badgeIcon = Icons.auto_awesome;
+                            Color badgeColor = AppTheme.primaryColor;
+
+                            if (section == 'past_search') {
+                              badgeText = 'Based on Recent Search';
+                              badgeIcon = Icons.search_rounded;
+                              badgeColor = Colors.deepOrange;
+                            } else if (section == 'interests') {
+                              badgeText = 'Matched with Interests';
+                              badgeIcon = Icons.favorite_border_rounded;
+                              badgeColor = Colors.purple;
+                            } else if (section == 'skill_level') {
+                              badgeText = 'Fits Skill Level';
+                              badgeIcon = Icons.trending_up_rounded;
+                              badgeColor = Colors.teal;
+                            } else if (section == 'continue') {
+                              badgeText = 'Continue Enrolled Path';
+                              badgeIcon = Icons.play_arrow_rounded;
+                              badgeColor = Colors.blue;
+                            }
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: badgeColor.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: badgeColor.withValues(alpha: 0.25)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: badgeColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(badgeIcon, color: badgeColor, size: 14),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              badgeText,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: badgeColor,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '$matchScore% Match',
+                                          style: const TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    reasoning,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 12.5,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  CourseCard(
+                                    course: course,
+                                    onTap: () => context.push(
+                                      '/learning/course',
+                                      extra: course,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        const SizedBox(height: 28),
+
+                        // 🎯 Skill-Gap Recommendations: Bridging missing skills for Target Job
                         _DiscoverSectionHeader(
-                          title: 'Popular courses',
-                          subtitle: visibleCourses.isEmpty
-                              ? 'Self-paced learning paths'
-                              : '${visibleCourses.length} to explore',
+                          title: '🎯 Career Skill-Gap Recommendations',
+                          subtitle: _userGoal.isNotEmpty
+                              ? 'Skills needed to become a $_userGoal'
+                              : 'Bridge missing skills for your target job role',
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loadingSkillGap)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                            ),
+                          )
+                        else if (_skillGapData != null)
+                          Builder(builder: (context) {
+                            final targetRole = _skillGapData!['targetRole']?.toString() ?? 'Software Developer';
+                            final readinessScore = (_skillGapData!['readinessScore'] as num?)?.toInt() ?? 50;
+                            final masteredSkills = (_skillGapData!['masteredSkills'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                            final missingSkills = (_skillGapData!['missingSkills'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                            final gapCourses = (_skillGapData!['recommendedCourses'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Icon(Icons.work_outline_rounded, color: Colors.blue, size: 20),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Target Role: $targetRole',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
+                                                    color: AppTheme.textPrimary,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Role Readiness: $readinessScore%',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: readinessScore >= 70 ? Colors.green : Colors.orange,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: (readinessScore >= 70 ? Colors.green : Colors.orange).withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              '$readinessScore% Ready',
+                                              style: TextStyle(
+                                                color: readinessScore >= 70 ? Colors.green : Colors.orange,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: LinearProgressIndicator(
+                                          value: readinessScore / 100.0,
+                                          minHeight: 7,
+                                          backgroundColor: Colors.grey.shade200,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            readinessScore >= 70 ? Colors.green : Colors.orange,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+
+                                      // Mastered vs Missing Skill breakdown
+                                      if (masteredSkills.isNotEmpty) ...[
+                                        const Text(
+                                          '✅ Mastered Skills (from Profile & Completed Courses):',
+                                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.green),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: masteredSkills.map((s) => Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text('✓ $s', style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                                          )).toList(),
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+
+                                      if (missingSkills.isNotEmpty) ...[
+                                        const Text(
+                                          '⚠️ Identified Skill Gap (Missing for Role):',
+                                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.deepOrange),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: missingSkills.map((s) => Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.deepOrange.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text('! $s', style: const TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.w600)),
+                                          )).toList(),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Courses recommended to bridge these gaps
+                                if (gapCourses.isNotEmpty) ...[
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 4),
+                                    child: Text(
+                                      'Recommended Courses to Bridge This Gap:',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...gapCourses.map((gc) {
+                                    final cid = gc['courseId']?.toString();
+                                    final reasoning = gc['reasoning']?.toString() ?? '';
+                                    final covered = (gc['coveredSkills'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                                    final course = courses.firstWhere((c) => c.id == cid, orElse: () => courses.first);
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withValues(alpha: 0.03),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue.withValues(alpha: 0.12),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'Bridges Skill Gap',
+                                                  style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 11),
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              if (covered.isNotEmpty)
+                                                Text(
+                                                  'Covers: ${covered.take(2).join(', ')}',
+                                                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600, fontSize: 11),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            reasoning,
+                                            style: const TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, height: 1.35),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          CourseCard(
+                                            course: course,
+                                            onTap: () => context.push(
+                                              '/learning/course',
+                                              extra: course,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ],
+                            );
+                          }),
+                        const SizedBox(height: 24),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Expanded(
+                              child: _DiscoverSectionHeader(
+                                title: '🔥 Trending & Popular Courses',
+                                subtitle: 'What local learners are taking right now',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // Filter Pills for Trending Criteria
+                        SizedBox(
+                          height: 36,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              'Trending',
+                              'Most Enrolled',
+                              'Highest Rated',
+                              'Newest',
+                            ].map((sortOption) {
+                              final isSelected = _trendingSort == sortOption;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (sortOption == 'Trending')
+                                        const Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.deepOrange),
+                                      if (sortOption == 'Most Enrolled')
+                                        const Icon(Icons.people_alt_rounded, size: 14, color: Colors.blue),
+                                      if (sortOption == 'Highest Rated')
+                                        const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                                      if (sortOption == 'Newest')
+                                        const Icon(Icons.access_time_rounded, size: 14, color: Colors.teal),
+                                      const SizedBox(width: 4),
+                                      Text(sortOption, style: const TextStyle(fontSize: 12)),
+                                    ],
+                                  ),
+                                  selected: isSelected,
+                                  selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                                  onSelected: (_) => setState(() => _trendingSort = sortOption),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         if (visibleCourses.isEmpty)
@@ -288,7 +1114,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       );
 }
 
-class CourseDetailsScreen extends StatelessWidget {
+class CourseDetailsScreen extends StatefulWidget {
   const CourseDetailsScreen({
     super.key,
     required this.course,
@@ -296,122 +1122,369 @@ class CourseDetailsScreen extends StatelessWidget {
   });
   final LearningCourse course;
   final bool isReportPreview;
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: Text(isReportPreview ? 'Reported Course Preview' : 'Course details'),
-          leading: isReportPreview ? IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-            tooltip: 'Back to Report',
-          ) : null,
-          actions: [
-            if (!isReportPreview)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  if (value == 'report') {
-                    _showReportDialog(context, course);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'report',
-                    child: Row(
-                      children: [
-                        Icon(Icons.report, color: Colors.red, size: 20),
-                        SizedBox(width: 8),
-                        Text('Report Course', style: TextStyle(color: Colors.red)),
-                      ],
+  State<CourseDetailsScreen> createState() => _CourseDetailsScreenState();
+}
+
+class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
+  List<Map<String, dynamic>> _similarCourses = [];
+  bool _loadingSimilar = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _trackViewAndLoadSimilar();
+  }
+
+  Future<void> _trackViewAndLoadSimilar() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final course = widget.course;
+
+    // 1. Log course view in Firestore for collaborative filtering
+    if (user != null) {
+      try {
+        final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        await userRef.set({
+          'viewedCourses': FieldValue.arrayUnion([course.id]),
+          'lastViewedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Increment course global view count
+        final courseRef = FirebaseFirestore.instance.collection('courses').doc(course.id);
+        await courseRef.set({
+          'viewCount': FieldValue.increment(1),
+          'viewerIds': FieldValue.arrayUnion([user.uid]),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error logging course view: $e');
+      }
+    }
+
+    // 2. Fetch behavioral co-views and co-enrollments
+    List<String> coViewedIds = [];
+    List<String> coEnrolledIds = [];
+    try {
+      final courseDoc = await FirebaseFirestore.instance.collection('courses').doc(course.id).get();
+      if (courseDoc.exists) {
+        final cData = courseDoc.data() ?? {};
+        coViewedIds = (cData['coViewedCourses'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        coEnrolledIds = (cData['coEnrolledCourses'] as List?)?.map((e) => e.toString()).toList() ?? [];
+      }
+    } catch (e) {
+      debugPrint('Error loading course co-views: $e');
+    }
+
+    // 3. Format current and candidate courses
+    final allCourses = LearningStore.instance.value;
+    final currentCourseData = {
+      'id': course.id,
+      'title': course.title,
+      'category': course.category,
+      'level': course.level,
+      'instructor': course.instructor,
+      'tags': course.modules.map((m) => m.title).toList(),
+    };
+
+    final candidateCoursesData = allCourses.map((c) => {
+      'id': c.id,
+      'title': c.title,
+      'category': c.category,
+      'level': c.level,
+      'instructor': c.instructor,
+      'tags': c.modules.map((m) => m.title).toList(),
+    }).toList();
+
+    // 4. Request AI similar course suggestions
+    final recs = await AISuggestionService.getSimilarCourses(
+      currentCourse: currentCourseData,
+      allCourses: candidateCoursesData,
+      coEnrolledCourseIds: coEnrolledIds,
+      coViewedCourseIds: coViewedIds,
+    );
+
+    if (mounted) {
+      setState(() {
+        _similarCourses = recs;
+        _loadingSimilar = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final course = widget.course;
+    final isReportPreview = widget.isReportPreview;
+    final allCourses = LearningStore.instance.value;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isReportPreview ? 'Reported Course Preview' : 'Course details'),
+        leading: isReportPreview ? IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back to Report',
+        ) : null,
+        actions: [
+          if (!isReportPreview)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'report') {
+                  _showReportDialog(context, course);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      Icon(Icons.report, color: Colors.red, size: 20),
+                      SizedBox(width: 8),
+                      Text('Report Course', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (isReportPreview)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'You are viewing this course as a moderator in preview mode.',
+                      style: TextStyle(fontWeight: FontWeight.w500),
                     ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.orange.shade800,
+                    ),
+                    child: const Text('Back to Report'),
                   ),
                 ],
               ),
-          ],
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (isReportPreview)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade300),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                    const SizedBox(width: 12),
-                    const Expanded(
+            ),
+          _CourseHero(course: course),
+          const SizedBox(height: 24),
+          Text(
+            'Course Modules',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                for (var i = 0; i < course.modules.length; i++)
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.iconBackground,
                       child: Text(
-                        'You are viewing this course as a moderator in preview mode.',
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                        '${i + 1}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
                       ),
                     ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.orange.shade800,
+                    title: Text(course.modules[i].title),
+                    subtitle: Text(
+                      '${course.modules[i].lessonCount} lessons • ${course.modules[i].duration}',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // AI Suggestion: Similar Courses ("Students who viewed this also viewed...")
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.groups_rounded, color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Students who viewed this also viewed',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
                       ),
-                      child: const Text('Back to Report'),
+                    ),
+                    Text(
+                      'Based on views, enrollments, and shared topic tags',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
-            _CourseHero(course: course),
-            const SizedBox(height: 24),
-            Text(
-              'Course Modules',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Column(
-                children: [
-                  for (var i = 0; i < course.modules.length; i++)
-                    ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: AppTheme.iconBackground,
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(color: AppTheme.primaryColor),
-                        ),
-                      ),
-                      title: Text(course.modules[i].title),
-                      subtitle: Text(
-                        '${course.modules[i].lessonCount} lessons • ${course.modules[i].duration}',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                    ),
-                ],
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (_loadingSimilar)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryColor),
               ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: FilledButton(
-              onPressed: () async {
-                await LearningStore.instance.enroll(course);
-                if (!context.mounted) {
-                  return;
-                }
-                context.go('/learning/my-courses');
-              },
-              child:
-                  Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
-            ),
+            )
+          else if (_similarCourses.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: const Text(
+                'Explore more courses from Discover to view peer recommendations.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              ),
+            )
+          else
+            ..._similarCourses.map((sim) {
+              final simCourseId = sim['courseId']?.toString();
+              final simScore = sim['similarityScore'] ?? 85;
+              final reasoning = sim['reasoning']?.toString() ?? 'Popular similar course explored by students';
+              final matchingCourse = allCourses.firstWhere(
+                (c) => c.id == simCourseId,
+                orElse: () => allCourses.first,
+              );
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.visibility_rounded, size: 12, color: AppTheme.primaryColor),
+                              SizedBox(width: 4),
+                              Text(
+                                'Co-Viewed',
+                                style: TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$simScore% Similarity',
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      reasoning,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppTheme.textPrimary,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    CourseCard(
+                      course: matchingCourse,
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CourseDetailsScreen(
+                              course: matchingCourse,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            onPressed: () async {
+              await LearningStore.instance.enroll(course);
+              if (!context.mounted) {
+                return;
+              }
+              context.go('/learning/my-courses');
+            },
+            child:
+                Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
           ),
         ),
-      );
+      ),
+    );
+  }
 
   void _showReportDialog(BuildContext context, LearningCourse course) {
     ReportReason reason = ReportReason.spam;
@@ -591,6 +1664,48 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
     );
   }
 
+  Future<void> _downloadCertificateForCourse(LearningCourse course) async {
+    try {
+      final document = pw.Document();
+      document.addPage(
+        pw.Page(
+          build: (context) => pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text(
+                  'CERTIFICATE OF COMPLETION',
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('This certifies that the learner successfully completed'),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  course.title,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('Awarded by PeerLearnHub System'),
+                pw.SizedBox(height: 8),
+                pw.Text('Date: ${DateTime.now().toLocal().toString().split(' ')[0]}'),
+              ],
+            ),
+          ),
+        ),
+      );
+      final bytes = await document.save();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'peerlearnhub-course-${course.id}-certificate.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download certificate: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<LearningCourse>>(
@@ -699,7 +1814,23 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
                                     extra: course,
                                   ),
                                 ),
-                                if (LearningStore.instance
+                                if (course.progress >= 100)
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 16),
+                                      child: FilledButton.icon(
+                                        onPressed: () => _downloadCertificateForCourse(course),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                        ),
+                                        icon: const Icon(Icons.workspace_premium),
+                                        label: const Text('Download Certificate (PDF)'),
+                                      ),
+                                    ),
+                                  )
+                                else if (LearningStore.instance
                                     .canSubmitAssignment(course))
                                   Align(
                                     alignment: Alignment.centerRight,
@@ -1242,6 +2373,29 @@ class CourseCard extends StatelessWidget {
                             label: course.category,
                           ),
                           _InfoChip(label: course.level),
+                          if (course.enrollmentCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.local_fire_department_rounded, color: Colors.deepOrange, size: 12),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${course.enrollmentCount} local ${course.enrollmentCount == 1 ? 'learner' : 'learners'}',
+                                    style: const TextStyle(
+                                      color: Colors.deepOrange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -1585,7 +2739,7 @@ class _MyLearningEmptyState extends StatelessWidget {
   }
 }
 
-class _EnrolledLessonCard extends StatelessWidget {
+class _EnrolledLessonCard extends StatefulWidget {
   const _EnrolledLessonCard({
     required this.lesson,
     required this.onOpen,
@@ -1599,6 +2753,79 @@ class _EnrolledLessonCard extends StatelessWidget {
   final ProviderSession? nextSession;
 
   @override
+  State<_EnrolledLessonCard> createState() => _EnrolledLessonCardState();
+}
+
+class _EnrolledLessonCardState extends State<_EnrolledLessonCard> {
+  bool _isCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCompletion();
+  }
+
+  Future<void> _checkCompletion() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('assignments')
+          .doc(widget.lesson.id)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() => _isCompleted = true);
+      }
+    } catch (e) {
+      debugPrint('Error checking lesson completion: $e');
+    }
+  }
+
+  Future<void> _downloadCertificate() async {
+    try {
+      final document = pw.Document();
+      document.addPage(
+        pw.Page(
+          build: (context) => pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text(
+                  'CERTIFICATE OF COMPLETION',
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('This certifies that the learner successfully completed'),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  widget.lesson.title,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text('Awarded by PeerLearnHub System'),
+                pw.SizedBox(height: 8),
+                pw.Text('Date: ${DateTime.now().toLocal().toString().split(' ')[0]}'),
+              ],
+            ),
+          ),
+        ),
+      );
+      final bytes = await document.save();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'peerlearnhub-lesson-${widget.lesson.id}-certificate.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download certificate: $e')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1607,7 +2834,7 @@ class _EnrolledLessonCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onOpen,
+          onTap: widget.onOpen,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -1617,24 +2844,48 @@ class _EnrolledLessonCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _CatalogThumb(
-                      image: lessonImageProvider(lesson.imageUrl),
-                      icon: _categoryIcon(lesson.category.label),
+                      image: lessonImageProvider(widget.lesson.imageUrl),
+                      icon: _categoryIcon(widget.lesson.category.label),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            lesson.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              height: 1.25,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.lesson.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (_isCompleted) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade100,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Completed',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -1642,16 +2893,16 @@ class _EnrolledLessonCard extends StatelessWidget {
                             runSpacing: 6,
                             children: [
                               _InfoChip(
-                                icon: _categoryIcon(lesson.category.label),
-                                label: lesson.category.label,
+                                icon: _categoryIcon(widget.lesson.category.label),
+                                label: widget.lesson.category.label,
                               ),
-                              _InfoChip(label: lesson.skillLevel.label),
+                              _InfoChip(label: widget.lesson.skillLevel.label),
                             ],
                           ),
-                          if (nextSession != null) ...[
+                          if (widget.nextSession != null) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Next session · ${formatDateTime(nextSession!.scheduledAt)}',
+                              'Next session · ${formatDateTime(widget.nextSession!.scheduledAt)}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -1667,7 +2918,7 @@ class _EnrolledLessonCard extends StatelessWidget {
                     PopupMenuButton<String>(
                       tooltip: 'Lesson options',
                       onSelected: (value) {
-                        if (value == 'remove') onRemove();
+                        if (value == 'remove') widget.onRemove();
                       },
                       itemBuilder: (context) => const [
                         PopupMenuItem(
@@ -1679,12 +2930,28 @@ class _EnrolledLessonCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.tonal(
-                    onPressed: onOpen,
-                    child: const Text('Continue'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonal(
+                        onPressed: widget.onOpen,
+                        child: const Text('Continue'),
+                      ),
+                    ),
+                    if (_isCompleted) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _downloadCertificate,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          icon: const Icon(Icons.workspace_premium, size: 18),
+                          label: const Text('Certificate'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -1757,6 +3024,7 @@ class _DiscoverHeader extends StatelessWidget {
     required this.greeting,
     required this.searchController,
     required this.onQueryChanged,
+    this.onSubmitted,
     required this.onProfile,
     required this.onLogout,
   });
@@ -1764,6 +3032,7 @@ class _DiscoverHeader extends StatelessWidget {
   final String greeting;
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback onProfile;
   final VoidCallback onLogout;
 
@@ -1835,6 +3104,7 @@ class _DiscoverHeader extends StatelessWidget {
               TextField(
                 controller: searchController,
                 onChanged: onQueryChanged,
+                onSubmitted: onSubmitted,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search lessons, skills, or topics',
