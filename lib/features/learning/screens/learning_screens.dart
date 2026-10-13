@@ -44,6 +44,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   static const _levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
   List<Map<String, dynamic>> _aiRecommendations = [];
   bool _loadingAiRecommendations = true;
+  Map<String, dynamic>? _skillGapData;
+  bool _loadingSkillGap = true;
 
   @override
   void initState() {
@@ -143,10 +145,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       courses: courseDataList,
     );
 
+    // Load Skill-Gap recommendations for target role vs current skills & completed courses
+    final targetRole = _userGoal.isNotEmpty ? _userGoal : 'Mobile Developer';
+    final completedCourseObjs = courses.where((c) => (learnerProfile['completedLessons'] as List? ?? []).contains(c.id)).map((c) => {
+      'id': c.id,
+      'title': c.title,
+      'category': c.category,
+    }).toList();
+
+    final gapResult = await AISuggestionService.getSkillGapRecommendations(
+      targetRole: targetRole,
+      currentSkills: _userInterests,
+      completedCourses: completedCourseObjs,
+      candidateCourses: courseDataList,
+    );
+
     if (mounted) {
       setState(() {
         _aiRecommendations = recs;
         _loadingAiRecommendations = false;
+        _skillGapData = gapResult;
+        _loadingSkillGap = false;
       });
     }
   }
@@ -757,6 +776,231 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                   ),
                                 ],
                               ),
+                            );
+                          }),
+                        const SizedBox(height: 28),
+
+                        // 🎯 Skill-Gap Recommendations: Bridging missing skills for Target Job
+                        _DiscoverSectionHeader(
+                          title: '🎯 Career Skill-Gap Recommendations',
+                          subtitle: _userGoal.isNotEmpty
+                              ? 'Skills needed to become a $_userGoal'
+                              : 'Bridge missing skills for your target job role',
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loadingSkillGap)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                            ),
+                          )
+                        else if (_skillGapData != null)
+                          Builder(builder: (context) {
+                            final targetRole = _skillGapData!['targetRole']?.toString() ?? 'Software Developer';
+                            final readinessScore = (_skillGapData!['readinessScore'] as num?)?.toInt() ?? 50;
+                            final masteredSkills = (_skillGapData!['masteredSkills'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                            final missingSkills = (_skillGapData!['missingSkills'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                            final gapCourses = (_skillGapData!['recommendedCourses'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Icon(Icons.work_outline_rounded, color: Colors.blue, size: 20),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Target Role: $targetRole',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
+                                                    color: AppTheme.textPrimary,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Role Readiness: $readinessScore%',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: readinessScore >= 70 ? Colors.green : Colors.orange,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: (readinessScore >= 70 ? Colors.green : Colors.orange).withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              '$readinessScore% Ready',
+                                              style: TextStyle(
+                                                color: readinessScore >= 70 ? Colors.green : Colors.orange,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: LinearProgressIndicator(
+                                          value: readinessScore / 100.0,
+                                          minHeight: 7,
+                                          backgroundColor: Colors.grey.shade200,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            readinessScore >= 70 ? Colors.green : Colors.orange,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+
+                                      // Mastered vs Missing Skill breakdown
+                                      if (masteredSkills.isNotEmpty) ...[
+                                        const Text(
+                                          '✅ Mastered Skills (from Profile & Completed Courses):',
+                                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.green),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: masteredSkills.map((s) => Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text('✓ $s', style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                                          )).toList(),
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+
+                                      if (missingSkills.isNotEmpty) ...[
+                                        const Text(
+                                          '⚠️ Identified Skill Gap (Missing for Role):',
+                                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.deepOrange),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: missingSkills.map((s) => Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.deepOrange.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text('! $s', style: const TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.w600)),
+                                          )).toList(),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Courses recommended to bridge these gaps
+                                if (gapCourses.isNotEmpty) ...[
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 4),
+                                    child: Text(
+                                      'Recommended Courses to Bridge This Gap:',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...gapCourses.map((gc) {
+                                    final cid = gc['courseId']?.toString();
+                                    final reasoning = gc['reasoning']?.toString() ?? '';
+                                    final covered = (gc['coveredSkills'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                                    final course = courses.firstWhere((c) => c.id == cid, orElse: () => courses.first);
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withValues(alpha: 0.03),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue.withValues(alpha: 0.12),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'Bridges Skill Gap',
+                                                  style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 11),
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              if (covered.isNotEmpty)
+                                                Text(
+                                                  'Covers: ${covered.take(2).join(', ')}',
+                                                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600, fontSize: 11),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            reasoning,
+                                            style: const TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, height: 1.35),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          CourseCard(
+                                            course: course,
+                                            onTap: () => context.push(
+                                              '/learning/course',
+                                              extra: course,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ],
                             );
                           }),
                         const SizedBox(height: 24),

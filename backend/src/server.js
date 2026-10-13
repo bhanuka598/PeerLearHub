@@ -710,6 +710,91 @@ Return ONLY a raw JSON object with this exact schema (no markdown formatting or 
   }
 });
 
+// AI Skill-gap recommendations endpoint
+app.post('/api/ai/skill-gap', async (req, res) => {
+  try {
+    const { targetRole, currentSkills, completedCourses, candidateCourses } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY missing' });
+    }
+    if (!targetRole || !Array.isArray(candidateCourses) || candidateCourses.length === 0) {
+      return res.json({ success: true, data: null });
+    }
+
+    const prompt = `
+You are an expert Career Advisor and Tech Skill-Gap Analyzer for PeerLearn Hub.
+Analyze the student's background against their Target Role to identify mastered vs missing skills, compute a career readiness score (0-100%), and recommend matching courses to bridge the gap.
+
+TARGET JOB ROLE: "${targetRole}"
+STUDENT'S CURRENT SKILLS: ${JSON.stringify(currentSkills || [])}
+COMPLETED COURSES: ${JSON.stringify(completedCourses || [])}
+AVAILABLE COURSES TO BRIDGE GAPS:
+${JSON.stringify(candidateCourses, null, 2)}
+
+Instructions:
+1. Identify 5-7 key skills required in industry for the target job role "${targetRole}".
+2. Classify them into "masteredSkills" (what the student already has from current skills or completed courses) and "missingSkills" (the skill gap).
+3. Compute a "readinessScore" percentage (integer 0-100).
+4. Select up to 4 best courses that teach the missing skills.
+5. For each recommended course provide:
+   - "courseId": exact ID
+   - "coveredSkills": list of missing skills covered
+   - "matchScore": integer 70-98
+   - "reasoning": 1 sentence explaining how it bridges their specific skill gap for the role.
+
+Return ONLY a raw JSON object with this exact format (no markdown formatting or backticks):
+{
+  "targetRole": "${targetRole}",
+  "readinessScore": 65,
+  "masteredSkills": ["Skill A", "Skill B"],
+  "missingSkills": ["Skill C", "Skill D", "Skill E"],
+  "recommendedCourses": [
+    {
+      "courseId": "string",
+      "coveredSkills": ["Skill C"],
+      "matchScore": 92,
+      "reasoning": "Closes your gap in Skill C needed for ${targetRole}."
+    }
+  ]
+}
+`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini skill-gap error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('Failed to parse skill-gap JSON:', cleanJson);
+    }
+
+    return res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Skill-gap route error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,

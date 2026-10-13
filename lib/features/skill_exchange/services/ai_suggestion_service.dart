@@ -521,4 +521,126 @@ Return ONLY raw JSON, with no markdown code fences or other text.
     scoredSimilar.sort((a, b) => (b['similarityScore'] as int).compareTo(a['similarityScore'] as int));
     return scoredSimilar.take(4).toList();
   }
+
+  /// AI Skill-Gap Analysis: Suggests courses to fill missing skills for a target job.
+  /// Inputs: targetRole, currentSkills, completedCourses, candidateCourses
+  /// Analyzes required skills for targetRole, identifies missing skills (gap),
+  /// and scores courses that bridge these missing skills.
+  static Future<Map<String, dynamic>> getSkillGapRecommendations({
+    required String targetRole,
+    required List<String> currentSkills,
+    required List<dynamic> completedCourses,
+    required List<dynamic> candidateCourses,
+  }) async {
+    // 1. Try Backend Gemini endpoint
+    try {
+      final backendUri = Uri.parse('${AuthService.backendBaseUrl}/api/ai/skill-gap');
+      final response = await http.post(
+        backendUri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'targetRole': targetRole,
+          'currentSkills': currentSkills,
+          'completedCourses': completedCourses,
+          'candidateCourses': candidateCourses,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['success'] == true && data['data'] is Map) {
+          return Map<String, dynamic>.from(data['data']);
+        }
+      }
+    } catch (e) {
+      debugPrint('Skill-gap AI backend error: $e');
+    }
+
+    // 2. Intelligent Heuristic / Domain Knowledge Skill Gap Analysis
+    final Map<String, List<String>> roleRequiredSkills = {
+      'mobile developer': ['Flutter', 'Dart', 'State Management', 'REST API', 'Firebase', 'Clean Architecture', 'Git'],
+      'frontend developer': ['HTML/CSS', 'JavaScript', 'React', 'Responsive Design', 'TypeScript', 'Web Performance', 'Git'],
+      'backend developer': ['Node.js', 'Express', 'Database (SQL/NoSQL)', 'REST APIs', 'Cloud & Docker', 'Security', 'Authentication'],
+      'full stack developer': ['Flutter', 'React', 'Node.js', 'Databases', 'Cloud & DevOps', 'API Design', 'System Architecture'],
+      'ui/ux designer': ['Figma', 'User Research', 'Wireframing', 'Prototyping', 'Design Systems', 'Usability Testing', 'Interaction Design'],
+      'data scientist': ['Python', 'Pandas', 'Machine Learning', 'Data Visualization', 'SQL', 'Statistical Modeling'],
+      'ai/ml engineer': ['Python', 'Deep Learning', 'PyTorch/TensorFlow', 'NLP', 'Computer Vision', 'Model Deployment'],
+      'cloud engineer': ['AWS/GCP', 'Docker', 'Kubernetes', 'CI/CD Pipelines', 'Linux', 'Infrastructure as Code'],
+      'cyber security analyst': ['Network Security', 'Penetration Testing', 'Cryptography', 'Identity & Access', 'Incident Response'],
+    };
+
+    final normalizedRole = targetRole.toLowerCase().trim();
+    List<String> requiredSkills = [];
+
+    // Find best role key match
+    for (final entry in roleRequiredSkills.entries) {
+      if (normalizedRole.contains(entry.key) || entry.key.contains(normalizedRole)) {
+        requiredSkills = entry.value;
+        break;
+      }
+    }
+
+    if (requiredSkills.isEmpty) {
+      requiredSkills = ['Core Fundamentals', 'Framework Mastery', 'Architecture & Testing', 'Production Deployment'];
+    }
+
+    final currentSkillsSet = currentSkills.map((s) => s.toLowerCase().trim()).toSet();
+    final completedTitles = completedCourses.map((c) => (c is Map ? c['title'] : c.toString()).toLowerCase()).toList();
+
+    // Extract already mastered skills from currentSkills + completedCourses
+    final masteredSkills = <String>[];
+    final missingSkills = <String>[];
+
+    for (final req in requiredSkills) {
+      final reqLow = req.toLowerCase();
+      final hasSkill = currentSkillsSet.contains(reqLow) ||
+          completedTitles.any((t) => t.contains(reqLow));
+      if (hasSkill) {
+        masteredSkills.add(req);
+      } else {
+        missingSkills.add(req);
+      }
+    }
+
+    // Score courses that address missing skills
+    final List<Map<String, dynamic>> recommendedCourses = [];
+    final completedCourseIds = completedCourses
+        .map((c) => c is Map ? c['id']?.toString() : c.toString())
+        .whereType<String>()
+        .toSet();
+
+    for (final c in candidateCourses) {
+      if (c is! Map || c['id'] == null) continue;
+      final cid = c['id'].toString();
+      if (completedCourseIds.contains(cid)) continue;
+
+      final title = (c['title'] ?? '').toString();
+      final tags = (c['tags'] as List?)?.map((t) => t.toString()).toList() ?? <String>[];
+      final fullText = '$title ${tags.join(' ')} ${c['category'] ?? ''}'.toLowerCase();
+
+      final coveredGaps = missingSkills.where((gap) => fullText.contains(gap.toLowerCase())).toList();
+      if (coveredGaps.isNotEmpty) {
+        final double score = (coveredGaps.length * 30.0 + 35.0).clamp(50.0, 98.0);
+        recommendedCourses.add({
+          'courseId': cid,
+          'coveredSkills': coveredGaps,
+          'matchScore': score.toInt(),
+          'reasoning': 'Closes critical skill gaps in ${coveredGaps.join(', ')} required for $targetRole.',
+        });
+      }
+    }
+
+    recommendedCourses.sort((a, b) => (b['matchScore'] as int).compareTo(a['matchScore'] as int));
+
+    final totalReq = requiredSkills.length;
+    final readinessScore = totalReq == 0 ? 100 : ((masteredSkills.length / totalReq) * 100).round();
+
+    return {
+      'targetRole': targetRole.isEmpty ? 'Software Professional' : targetRole,
+      'readinessScore': readinessScore,
+      'masteredSkills': masteredSkills,
+      'missingSkills': missingSkills,
+      'recommendedCourses': recommendedCourses.take(4).toList(),
+    };
+  }
 }
