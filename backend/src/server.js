@@ -631,6 +631,85 @@ Return ONLY a raw JSON object with this exact shape (no markdown fences):
   }
 });
 
+// AI Similar Courses endpoint ("Students who viewed this also viewed...")
+app.post('/api/ai/similar-courses', async (req, res) => {
+  try {
+    const { currentCourse, courses, coEnrolledCourseIds, coViewedCourseIds } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY missing' });
+    }
+    if (!currentCourse || !Array.isArray(courses) || courses.length === 0) {
+      return res.json({ success: true, similarCourses: [] });
+    }
+
+    const prompt = `
+You are an expert Education Recommender AI for PeerLearn Hub.
+A student is currently viewing the following course:
+CURRENT COURSE:
+${JSON.stringify(currentCourse, null, 2)}
+
+ADDITIONAL BEHAVIORAL SIGNALS:
+- Co-Enrolled Course IDs: ${JSON.stringify(coEnrolledCourseIds || [])}
+- Frequently Co-Viewed Course IDs: ${JSON.stringify(coViewedCourseIds || [])}
+
+AVAILABLE CANDIDATE COURSES:
+${JSON.stringify(courses, null, 2)}
+
+TASK:
+Provide up to 4 similar courses under the theme "Students who viewed this also viewed...".
+Consider:
+1. Shared concepts, tags, and curriculum progression.
+2. Behavioral co-views and co-enrollments.
+3. Natural next steps or complementary skills.
+
+Return ONLY a raw JSON object with this exact schema (no markdown formatting or fences):
+{
+  "similarCourses": [
+    {
+      "courseId": "string",
+      "similarityScore": 92,
+      "reasoning": "Concise 1-sentence reason why students viewing the current course also explore this."
+    }
+  ]
+}
+`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini similar courses error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed = { similarCourses: [] };
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('Failed to parse similar courses JSON:', cleanJson);
+    }
+
+    return res.json({ success: true, similarCourses: parsed.similarCourses ?? [] });
+  } catch (error) {
+    console.error('Similar courses error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,

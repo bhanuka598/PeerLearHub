@@ -796,7 +796,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       );
 }
 
-class CourseDetailsScreen extends StatelessWidget {
+class CourseDetailsScreen extends StatefulWidget {
   const CourseDetailsScreen({
     super.key,
     required this.course,
@@ -804,122 +804,369 @@ class CourseDetailsScreen extends StatelessWidget {
   });
   final LearningCourse course;
   final bool isReportPreview;
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: Text(isReportPreview ? 'Reported Course Preview' : 'Course details'),
-          leading: isReportPreview ? IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-            tooltip: 'Back to Report',
-          ) : null,
-          actions: [
-            if (!isReportPreview)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  if (value == 'report') {
-                    _showReportDialog(context, course);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'report',
-                    child: Row(
-                      children: [
-                        Icon(Icons.report, color: Colors.red, size: 20),
-                        SizedBox(width: 8),
-                        Text('Report Course', style: TextStyle(color: Colors.red)),
-                      ],
+  State<CourseDetailsScreen> createState() => _CourseDetailsScreenState();
+}
+
+class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
+  List<Map<String, dynamic>> _similarCourses = [];
+  bool _loadingSimilar = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _trackViewAndLoadSimilar();
+  }
+
+  Future<void> _trackViewAndLoadSimilar() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final course = widget.course;
+
+    // 1. Log course view in Firestore for collaborative filtering
+    if (user != null) {
+      try {
+        final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        await userRef.set({
+          'viewedCourses': FieldValue.arrayUnion([course.id]),
+          'lastViewedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Increment course global view count
+        final courseRef = FirebaseFirestore.instance.collection('courses').doc(course.id);
+        await courseRef.set({
+          'viewCount': FieldValue.increment(1),
+          'viewerIds': FieldValue.arrayUnion([user.uid]),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error logging course view: $e');
+      }
+    }
+
+    // 2. Fetch behavioral co-views and co-enrollments
+    List<String> coViewedIds = [];
+    List<String> coEnrolledIds = [];
+    try {
+      final courseDoc = await FirebaseFirestore.instance.collection('courses').doc(course.id).get();
+      if (courseDoc.exists) {
+        final cData = courseDoc.data() ?? {};
+        coViewedIds = (cData['coViewedCourses'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        coEnrolledIds = (cData['coEnrolledCourses'] as List?)?.map((e) => e.toString()).toList() ?? [];
+      }
+    } catch (e) {
+      debugPrint('Error loading course co-views: $e');
+    }
+
+    // 3. Format current and candidate courses
+    final allCourses = LearningStore.instance.value;
+    final currentCourseData = {
+      'id': course.id,
+      'title': course.title,
+      'category': course.category,
+      'level': course.level,
+      'instructor': course.instructor,
+      'tags': course.modules.map((m) => m.title).toList(),
+    };
+
+    final candidateCoursesData = allCourses.map((c) => {
+      'id': c.id,
+      'title': c.title,
+      'category': c.category,
+      'level': c.level,
+      'instructor': c.instructor,
+      'tags': c.modules.map((m) => m.title).toList(),
+    }).toList();
+
+    // 4. Request AI similar course suggestions
+    final recs = await AISuggestionService.getSimilarCourses(
+      currentCourse: currentCourseData,
+      allCourses: candidateCoursesData,
+      coEnrolledCourseIds: coEnrolledIds,
+      coViewedCourseIds: coViewedIds,
+    );
+
+    if (mounted) {
+      setState(() {
+        _similarCourses = recs;
+        _loadingSimilar = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final course = widget.course;
+    final isReportPreview = widget.isReportPreview;
+    final allCourses = LearningStore.instance.value;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isReportPreview ? 'Reported Course Preview' : 'Course details'),
+        leading: isReportPreview ? IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back to Report',
+        ) : null,
+        actions: [
+          if (!isReportPreview)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'report') {
+                  _showReportDialog(context, course);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      Icon(Icons.report, color: Colors.red, size: 20),
+                      SizedBox(width: 8),
+                      Text('Report Course', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (isReportPreview)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'You are viewing this course as a moderator in preview mode.',
+                      style: TextStyle(fontWeight: FontWeight.w500),
                     ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.orange.shade800,
+                    ),
+                    child: const Text('Back to Report'),
                   ),
                 ],
               ),
-          ],
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (isReportPreview)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade300),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                    const SizedBox(width: 12),
-                    const Expanded(
+            ),
+          _CourseHero(course: course),
+          const SizedBox(height: 24),
+          Text(
+            'Course Modules',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                for (var i = 0; i < course.modules.length; i++)
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.iconBackground,
                       child: Text(
-                        'You are viewing this course as a moderator in preview mode.',
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                        '${i + 1}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
                       ),
                     ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.orange.shade800,
+                    title: Text(course.modules[i].title),
+                    subtitle: Text(
+                      '${course.modules[i].lessonCount} lessons • ${course.modules[i].duration}',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // AI Suggestion: Similar Courses ("Students who viewed this also viewed...")
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.groups_rounded, color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Students who viewed this also viewed',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
                       ),
-                      child: const Text('Back to Report'),
+                    ),
+                    Text(
+                      'Based on views, enrollments, and shared topic tags',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
-            _CourseHero(course: course),
-            const SizedBox(height: 24),
-            Text(
-              'Course Modules',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Column(
-                children: [
-                  for (var i = 0; i < course.modules.length; i++)
-                    ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: AppTheme.iconBackground,
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(color: AppTheme.primaryColor),
-                        ),
-                      ),
-                      title: Text(course.modules[i].title),
-                      subtitle: Text(
-                        '${course.modules[i].lessonCount} lessons • ${course.modules[i].duration}',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                    ),
-                ],
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (_loadingSimilar)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryColor),
               ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: FilledButton(
-              onPressed: () async {
-                await LearningStore.instance.enroll(course);
-                if (!context.mounted) {
-                  return;
-                }
-                context.go('/learning/my-courses');
-              },
-              child:
-                  Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
-            ),
+            )
+          else if (_similarCourses.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: const Text(
+                'Explore more courses from Discover to view peer recommendations.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              ),
+            )
+          else
+            ..._similarCourses.map((sim) {
+              final simCourseId = sim['courseId']?.toString();
+              final simScore = sim['similarityScore'] ?? 85;
+              final reasoning = sim['reasoning']?.toString() ?? 'Popular similar course explored by students';
+              final matchingCourse = allCourses.firstWhere(
+                (c) => c.id == simCourseId,
+                orElse: () => allCourses.first,
+              );
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.visibility_rounded, size: 12, color: AppTheme.primaryColor),
+                              SizedBox(width: 4),
+                              Text(
+                                'Co-Viewed',
+                                style: TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$simScore% Similarity',
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      reasoning,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppTheme.textPrimary,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    CourseCard(
+                      course: matchingCourse,
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CourseDetailsScreen(
+                              course: matchingCourse,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            onPressed: () async {
+              await LearningStore.instance.enroll(course);
+              if (!context.mounted) {
+                return;
+              }
+              context.go('/learning/my-courses');
+            },
+            child:
+                Text(course.enrolled ? 'Go to My Learning' : 'Enroll Now'),
           ),
         ),
-      );
+      ),
+    );
+  }
 
   void _showReportDialog(BuildContext context, LearningCourse course) {
     ReportReason reason = ReportReason.spam;

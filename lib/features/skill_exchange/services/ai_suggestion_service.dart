@@ -408,4 +408,117 @@ Return ONLY raw JSON, with no markdown code fences or other text.
     scoredCourses.sort((a, b) => (b['matchScore'] as int).compareTo(a['matchScore'] as int));
     return scoredCourses.take(6).toList();
   }
+
+  /// AI Similar Courses: "Students who viewed this also viewed..."
+  /// Matches candidate courses against current course using:
+  /// 1. Tag & Topic Overlap (Weight: 40%)
+  /// 2. Co-Enrollment / Category Affinity (Weight: 35%)
+  /// 3. Collaborative View Patterns & Difficulty Balance (Weight: 25%)
+  static Future<List<Map<String, dynamic>>> getSimilarCourses({
+    required Map<String, dynamic> currentCourse,
+    required List<dynamic> allCourses,
+    List<String> coEnrolledCourseIds = const [],
+    List<String> coViewedCourseIds = const [],
+  }) async {
+    final currentId = currentCourse['id']?.toString() ?? '';
+    final currentTags = (currentCourse['tags'] as List?)
+            ?.map((t) => t.toString().toLowerCase())
+            .toSet() ??
+        <String>{};
+    final currentCategory = (currentCourse['category'] ?? '').toString().toLowerCase();
+    final currentLevel = (currentCourse['level'] ?? '').toString().toLowerCase();
+
+    // 1. Backend AI Endpoint Attempt
+    try {
+      final backendUri = Uri.parse('${AuthService.backendBaseUrl}/api/ai/similar-courses');
+      final response = await http.post(
+        backendUri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'currentCourse': currentCourse,
+          'courses': allCourses,
+          'coEnrolledCourseIds': coEnrolledCourseIds,
+          'coViewedCourseIds': coViewedCourseIds,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['success'] == true && data['similarCourses'] is List) {
+          final list = List<Map<String, dynamic>>.from(data['similarCourses']);
+          if (list.isNotEmpty) {
+            return list;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Similar courses backend proxy error: $e');
+    }
+
+    // 2. Intelligent Algorithmic / Heuristic Fallback
+    final List<Map<String, dynamic>> scoredSimilar = [];
+
+    for (final c in allCourses) {
+      if (c is! Map || c['id'] == null) continue;
+      final cid = c['id'].toString();
+      if (cid == currentId) continue; // Exclude current course
+
+      final candCategory = (c['category'] ?? '').toString().toLowerCase();
+      final candLevel = (c['level'] ?? '').toString().toLowerCase();
+      final candTags = (c['tags'] as List?)
+              ?.map((t) => t.toString().toLowerCase())
+              .toSet() ??
+          <String>{};
+
+      double score = 40.0;
+      final List<String> reasons = [];
+
+      // A. Tag & Topic Overlap
+      final sharedTags = currentTags.intersection(candTags);
+      if (sharedTags.isNotEmpty) {
+        score += (sharedTags.length * 15.0).clamp(15.0, 35.0);
+        reasons.add('Shares core topics: ${sharedTags.take(2).join(', ')}');
+      }
+
+      // B. Category & Domain Synergy
+      if (candCategory == currentCategory) {
+        score += 20.0;
+        reasons.add('Same ${c['category']} domain');
+      } else if (_areCategoriesComplementary(currentCategory, candCategory)) {
+        score += 15.0;
+        reasons.add('High cross-skill synergy');
+      }
+
+      // C. Co-viewed behavioral signal
+      if (coViewedCourseIds.contains(cid)) {
+        score += 20.0;
+        reasons.add('Frequently viewed together by students');
+      }
+
+      // D. Co-enrolled behavioral signal
+      if (coEnrolledCourseIds.contains(cid)) {
+        score += 20.0;
+        reasons.add('Popular follow-up enrollment');
+      }
+
+      // E. Level progression or match
+      if (candLevel == currentLevel) {
+        score += 10.0;
+      }
+
+      final finalScore = score.clamp(50.0, 99.0).toInt();
+      final String reasonText = reasons.isNotEmpty
+          ? reasons.join(' • ')
+          : 'Popular similar course explored by peer learners.';
+
+      scoredSimilar.add({
+        'courseId': cid,
+        'similarityScore': finalScore,
+        'reasoning': reasonText,
+      });
+    }
+
+    scoredSimilar.sort((a, b) => (b['similarityScore'] as int).compareTo(a['similarityScore'] as int));
+    return scoredSimilar.take(4).toList();
+  }
 }
