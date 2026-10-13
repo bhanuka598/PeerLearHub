@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/moderation_activity.dart';
 
 class ActivityLogService {
@@ -27,7 +28,7 @@ class ActivityLogService {
         'metadata': metadata ?? {},
       });
     } catch (e) {
-      print('Error logging action: $e');
+      debugPrint('Error logging action: $e');
     }
   }
 
@@ -85,7 +86,7 @@ class ActivityLogService {
         'total': activities.length,
       };
     } catch (e) {
-      print('Error getting stats: $e');
+      debugPrint('Error getting stats: $e');
       return {'today': 0, 'thisWeek': 0, 'thisMonth': 0, 'total': 0};
     }
   }

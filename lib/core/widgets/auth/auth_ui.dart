@@ -245,8 +245,8 @@ class AuthFormShell extends StatelessWidget {
                             _AuthFormCard(
                               title: title,
                               subtitle: subtitle,
-                              child: child,
                               footer: footer,
+                              child: child,
                             ),
                           ],
                         ),
@@ -284,8 +284,8 @@ class AuthFormShell extends StatelessWidget {
                         child: _AuthFormCard(
                           title: title,
                           subtitle: subtitle,
-                          child: child,
                           footer: footer,
+                          child: child,
                         ),
                       ),
                     ),

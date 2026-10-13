@@ -198,7 +198,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -231,7 +231,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                                   height: 72,
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Colors.white.withValues(alpha: 0.7),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Image.asset(
@@ -309,7 +309,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryTeal.withOpacity(0.1),
+                            color: AppColors.primaryTeal.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -342,7 +342,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -396,7 +396,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -431,7 +431,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -466,7 +466,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -540,7 +540,7 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(

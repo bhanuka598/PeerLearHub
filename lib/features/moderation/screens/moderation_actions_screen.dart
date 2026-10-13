@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../services/activity_log_service.dart';
 import '../services/auth_service.dart';
@@ -37,7 +36,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -110,7 +109,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -245,7 +244,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -256,7 +255,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: indicatorColor.withOpacity(0.1),
+              color: indicatorColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -292,7 +291,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: indicatorColor.withOpacity(0.1),
+                        color: indicatorColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

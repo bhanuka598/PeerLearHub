@@ -71,6 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
             AppAuth.instance.getHomeRouteForRole(roleString);
 
         AppAuth.instance.setRoleFromApi(roleString);
+        if (!mounted) return;
         context.go(redirectRoute);
         return;
       } catch (e) {
@@ -78,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
         AppAuth.instance.setRoleFromApi(fallbackRole);
       }
 
+      if (!mounted) return;
       context.go(AppAuth.instance.getHomeRoute());
     } on FirebaseAuthException catch (error) {
       if (mounted) {

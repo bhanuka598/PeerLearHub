@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/moderation_report.dart';
+import 'package:flutter/foundation.dart';
 
 class CommunitySafetyService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -34,7 +34,7 @@ class CommunitySafetyService {
       final trustIndex = handledPercentage - (highSeverityOpen * 5);
       return trustIndex.clamp(0, 100);
     } catch (e) {
-      print('Error calculating trust index: $e');
+      debugPrint('Error calculating trust index: $e');
       return 0.0;
     }
   }
@@ -75,7 +75,7 @@ class CommunitySafetyService {
         'total': usersSnapshot.docs.length,
       };
     } catch (e) {
-      print('Error getting trust distribution: $e');
+      debugPrint('Error getting trust distribution: $e');
       return {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0, 'total': 0};
     }
   }
@@ -101,7 +101,7 @@ class CommunitySafetyService {
 
       return volumes;
     } catch (e) {
-      print('Error getting report volume: $e');
+      debugPrint('Error getting report volume: $e');
       return List.filled(7, 0);
     }
   }
@@ -137,7 +137,7 @@ class CommunitySafetyService {
 
       return topCategories;
     } catch (e) {
-      print('Error getting top categories: $e');
+      debugPrint('Error getting top categories: $e');
       return {};
     }
   }
@@ -185,7 +185,7 @@ class CommunitySafetyService {
 
       return alerts;
     } catch (e) {
-      print('Error getting safety alerts: $e');
+      debugPrint('Error getting safety alerts: $e');
       return [];
     }
   }

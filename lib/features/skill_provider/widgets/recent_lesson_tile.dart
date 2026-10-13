@@ -59,6 +59,16 @@ class RecentLessonTile extends StatelessWidget {
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
+                onPressed: () => context.push(
+                  '/skill-provider/lesson/${lesson.id}/manage',
+                  extra: lesson,
+                ),
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                color: AppTheme.primaryColor,
+                tooltip: 'Manage',
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
                 onPressed: onEdit ??
                     () => context.push('/skill-provider/edit', extra: lesson),
                 icon: const Icon(Icons.edit_outlined, size: 20),

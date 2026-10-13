@@ -35,6 +35,48 @@ enum ExchangeType {
   skillExchange,
 }
 
+/// Soft module placeholder for nesting quizzes and assignments.
+/// Existing lessons without modules default to a single "Main" module.
+class LessonModule {
+  const LessonModule({
+    required this.id,
+    required this.title,
+    required this.order,
+  });
+
+  final String id;
+  final String title;
+  final int order;
+
+  static const defaultMain = LessonModule(
+    id: 'main',
+    title: 'Main',
+    order: 1,
+  );
+
+  static List<LessonModule> defaultModules() => const [defaultMain];
+
+  LessonModule copyWith({String? id, String? title, int? order}) {
+    return LessonModule(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      order: order ?? this.order,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {'id': id, 'title': title, 'order': order};
+  }
+
+  factory LessonModule.fromMap(Map<String, dynamic> map) {
+    return LessonModule(
+      id: map['id'] as String? ?? 'main',
+      title: map['title'] as String? ?? 'Main',
+      order: (map['order'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
 class LessonAvailability {
   const LessonAvailability({
     required this.availableDays,
@@ -91,6 +133,7 @@ class Lesson {
     this.exchangeType = ExchangeType.paid,
     this.learningMaterials = const [],
     this.youtubePlaylistUrl,
+    this.modules = const [LessonModule.defaultMain],
   });
 
   final String id;
@@ -111,6 +154,7 @@ class Lesson {
   final ExchangeType exchangeType;
   final List<String> learningMaterials;
   final String? youtubePlaylistUrl;
+  final List<LessonModule> modules;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -133,6 +177,7 @@ class Lesson {
     ExchangeType? exchangeType,
     List<String>? learningMaterials,
     String? youtubePlaylistUrl,
+    List<LessonModule>? modules,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearPrice = false,
@@ -157,9 +202,21 @@ class Lesson {
       exchangeType: exchangeType ?? this.exchangeType,
       learningMaterials: learningMaterials ?? this.learningMaterials,
       youtubePlaylistUrl: youtubePlaylistUrl ?? this.youtubePlaylistUrl,
+      modules: modules ?? this.modules,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  static List<LessonModule> _parseModules(dynamic raw) {
+    if (raw is! List || raw.isEmpty) {
+      return LessonModule.defaultModules();
+    }
+    return raw
+        .map((item) => LessonModule.fromMap(
+              Map<String, dynamic>.from(item as Map),
+            ))
+        .toList();
   }
 
   Map<String, dynamic> toMap() {
@@ -182,6 +239,7 @@ class Lesson {
       'exchangeType': exchangeType.name,
       'learningMaterials': learningMaterials,
       'youtubePlaylistUrl': youtubePlaylistUrl,
+      'modules': modules.map((m) => m.toMap()).toList(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -206,6 +264,7 @@ class Lesson {
       'exchangeType': exchangeType.name,
       'learningMaterials': learningMaterials,
       'youtubePlaylistUrl': youtubePlaylistUrl,
+      'modules': modules.map((m) => m.toMap()).toList(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -237,6 +296,7 @@ class Lesson {
       learningMaterials:
           List<String>.from(map['learningMaterials'] as List? ?? []),
       youtubePlaylistUrl: map['youtubePlaylistUrl'] as String?,
+      modules: _parseModules(map['modules']),
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
     );
@@ -286,6 +346,7 @@ class Lesson {
       learningMaterials:
           List<String>.from(data['learningMaterials'] as List? ?? []),
       youtubePlaylistUrl: data['youtubePlaylistUrl'] as String?,
+      modules: _parseModules(data['modules']),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
     );

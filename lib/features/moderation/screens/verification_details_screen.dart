@@ -211,7 +211,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
+                                      color: Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 12,
                                       offset: const Offset(0, 6),
                                     ),
@@ -221,7 +221,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                   children: [
                                     CircleAvatar(
                                       radius: 32,
-                                      backgroundColor: _getStatusColor().withOpacity(0.1),
+                                      backgroundColor: _getStatusColor().withValues(alpha: 0.1),
                                       backgroundImage: const AssetImage(
                                         'assets/images/profile_hero.png',
                                       ),
@@ -246,7 +246,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                               vertical: 6,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: _getStatusColor().withOpacity(0.1),
+                                              color: _getStatusColor().withValues(alpha: 0.1),
                                               borderRadius: BorderRadius.circular(12),
                                             ),
                                             child: Text(
@@ -273,7 +273,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 12,
                               offset: const Offset(0, 6),
                             ),
@@ -332,7 +332,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 12,
                                 offset: const Offset(0, 6),
                               ),
@@ -375,7 +375,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 12,
                                 offset: const Offset(0, 6),
                               ),

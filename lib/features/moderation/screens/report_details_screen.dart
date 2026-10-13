@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../models/moderation_report.dart';
-import 'package:go_router/go_router.dart';
 import '../../skill_provider/services/firebase_lesson_service.dart';
 import '../../learning/data/learning_store.dart';
 import '../services/moderation_service.dart';
@@ -179,7 +178,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
+                                      color: Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 12,
                                       offset: const Offset(0, 6),
                                     ),
@@ -191,7 +190,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                       width: 60,
                                       height: 60,
                                       decoration: BoxDecoration(
-                                        color: _getSeverityColor().withOpacity(0.1),
+                                        color: _getSeverityColor().withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       child: Icon(
@@ -222,7 +221,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                                   vertical: 4,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: _getStatusColor().withOpacity(0.1),
+                                                  color: _getStatusColor().withValues(alpha: 0.1),
                                                   borderRadius: BorderRadius.circular(8),
                                                 ),
                                                 child: Text(
@@ -241,7 +240,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                                                   vertical: 4,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: _getSeverityColor().withOpacity(0.1),
+                                                  color: _getSeverityColor().withValues(alpha: 0.1),
                                                   borderRadius: BorderRadius.circular(8),
                                                 ),
                                                 child: Text(
@@ -270,7 +269,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 12,
                               offset: const Offset(0, 6),
                             ),
@@ -319,7 +318,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 12,
                               offset: const Offset(0, 6),
                             ),
@@ -392,7 +391,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 12,
                               offset: const Offset(0, 6),
                             ),

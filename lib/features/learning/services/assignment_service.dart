@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:peer_learn_hub/core/auth/auth_service.dart';
 
@@ -61,7 +62,7 @@ class AssignmentService {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     } catch (firestoreError) {
-      print('Firestore direct save error: $firestoreError');
+      debugPrint('Firestore direct save error: $firestoreError');
       throw StateError('Failed to save assignment to database: $firestoreError');
     }
 
@@ -81,7 +82,7 @@ class AssignmentService {
         ).timeout(const Duration(seconds: 3));
       }
     } catch (e) {
-      print('Backend assignment sync skipped/failed: $e');
+      debugPrint('Backend assignment sync skipped/failed: $e');
     }
   }
 }

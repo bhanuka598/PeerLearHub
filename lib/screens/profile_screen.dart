@@ -600,7 +600,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       runSpacing: 8,
                       children: verifiedSkills.map((skill) => Chip(
                         label: Text(skill),
-                        backgroundColor: Colors.teal.withOpacity(0.1),
+                        backgroundColor: Colors.teal.withValues(alpha: 0.1),
                         side: BorderSide.none,
                         avatar: const Icon(Icons.verified, size: 16, color: Colors.teal),
                       )).toList(),
@@ -766,7 +766,7 @@ class _VerificationStatusWidget extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.1),
+                              color: statusColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class ModeratorAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -22,7 +23,7 @@ class ModeratorAuthService {
       final role = userDoc.data()?['role'] as String?;
       return role == 'moderator';
     } catch (e) {
-      print('Error checking moderator status: $e');
+      debugPrint('Error checking moderator status: $e');
       return false;
     }
   }

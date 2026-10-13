@@ -20,10 +20,52 @@ service cloud.firestore {
         allow read, create, update: if request.auth != null
           && request.auth.uid == userId;
       }
+
+      match /quizSubmissions/{submissionId} {
+        allow read, create, update: if request.auth != null
+          && request.auth.uid == userId;
+        allow delete: if false;
+      }
+
+      match /assignmentSubmissions/{submissionId} {
+        allow read, create, update: if request.auth != null
+          && request.auth.uid == userId;
+        allow delete: if false;
+      }
     }
 
     match /lessons/{lessonId} {
       allow read, write: if request.auth != null;
+
+      match /modules/{moduleId}/quizzes/{quizDoc} {
+        allow read: if request.auth != null
+          && (resource.data.status == 'published'
+              || get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid
+              || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator');
+        allow create, update: if request.auth != null
+          && get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid;
+        allow update: if request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+        match /versions/{versionId} {
+          allow read: if request.auth != null;
+          allow write: if request.auth != null
+            && get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid;
+        }
+      }
+
+      match /modules/{moduleId}/assignment/{assignmentDoc} {
+        allow read: if request.auth != null
+          && (resource.data.status == 'published'
+              || get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid
+              || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator');
+        allow create, update: if request.auth != null
+          && get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid;
+        allow update: if request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      }
     }
 
     match /reviews/{reviewId} {

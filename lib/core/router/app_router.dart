@@ -9,7 +9,12 @@ import 'package:peer_learn_hub/features/learning/screens/student_lesson_details_
 import 'package:peer_learn_hub/features/notifications/screens/notifications_screen.dart';
 import 'package:peer_learn_hub/features/learning/models/learning_quiz.dart';
 import 'package:peer_learn_hub/features/learning/screens/assignment_screen.dart';
+import 'package:peer_learn_hub/features/learning/screens/assignment_submit_screen.dart';
+import 'package:peer_learn_hub/features/learning/screens/quiz_attempt_screen.dart';
 import 'package:peer_learn_hub/features/skill_exchange/skill_exchange.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/assignment_authoring_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/course_manage_screen.dart';
+import 'package:peer_learn_hub/features/skill_provider/screens/quiz_authoring_screen.dart';
 import 'package:peer_learn_hub/features/skill_provider/models/booking_request.dart';
 import 'package:peer_learn_hub/features/skill_provider/models/provider_session.dart';
 import 'package:peer_learn_hub/features/skill_provider/screens/booking_details_screen.dart';
@@ -156,6 +161,24 @@ class RouterClass {
         },
       ),
       GoRoute(
+        path: '/learning/lesson/:lessonId/module/:moduleId/quiz',
+        builder: (context, state) {
+          return QuizAttemptScreen(
+            lessonId: state.pathParameters['lessonId']!,
+            moduleId: state.pathParameters['moduleId']!,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/learning/lesson/:lessonId/module/:moduleId/assignment',
+        builder: (context, state) {
+          return AssignmentSubmitScreen(
+            lessonId: state.pathParameters['lessonId']!,
+            moduleId: state.pathParameters['moduleId']!,
+          );
+        },
+      ),
+      GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
@@ -187,6 +210,34 @@ class RouterClass {
           return lesson is Lesson
               ? LessonDetailsScreen(lesson: lesson)
               : const SkillProviderDashboardScreen();
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/lesson/:lessonId/manage',
+        builder: (context, state) {
+          final lesson = state.extra;
+          return CourseManageScreen(
+            lessonId: state.pathParameters['lessonId']!,
+            lesson: lesson is Lesson ? lesson : null,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/lesson/:lessonId/module/:moduleId/quiz',
+        builder: (context, state) {
+          return QuizAuthoringScreen(
+            lessonId: state.pathParameters['lessonId']!,
+            moduleId: state.pathParameters['moduleId']!,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/skill-provider/lesson/:lessonId/module/:moduleId/assignment',
+        builder: (context, state) {
+          return AssignmentAuthoringScreen(
+            lessonId: state.pathParameters['lessonId']!,
+            moduleId: state.pathParameters['moduleId']!,
+          );
         },
       ),
       GoRoute(

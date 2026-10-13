@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import '../../../core/constants/app_colors.dart';
 import '../services/community_safety_service.dart';
 import '../widgets/moderator_app_bar.dart';
@@ -116,7 +115,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),
@@ -131,7 +130,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                       borderRadius: BorderRadius.circular(18),
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.primaryTeal.withOpacity(0.12),
+                          AppColors.primaryTeal.withValues(alpha: 0.12),
                           AppColors.primaryLight,
                         ],
                         begin: Alignment.centerLeft,
@@ -278,7 +277,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -343,7 +342,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -389,7 +388,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                                           height: height.clamp(8.0, 100.0),
                                           width: double.infinity,
                                           decoration: BoxDecoration(
-                                            color: AppColors.primaryTeal.withOpacity(0.75),
+                                            color: AppColors.primaryTeal.withValues(alpha: 0.75),
                                             borderRadius: const BorderRadius.vertical(
                                               top: Radius.circular(6),
                                             ),
@@ -421,7 +420,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -468,7 +467,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -596,16 +595,16 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -637,7 +636,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
+                        color: color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

@@ -127,6 +127,17 @@ class LessonListCard extends StatelessWidget {
                   ),
                 ),
                 TextButton.icon(
+                  onPressed: () => context.push(
+                    '/skill-provider/lesson/${lesson.id}/manage',
+                    extra: lesson,
+                  ),
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Manage'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                  ),
+                ),
+                TextButton.icon(
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Edit'),

@@ -136,7 +136,7 @@ class VerificationService {
       await NotificationService.instance.createIfAbsent(
         AppNotification(
           id: AppNotification.buildId(
-            sessionId: 'verif_${requestId}',
+            sessionId: 'verif_$requestId',
             type: NotificationType.verificationApproved,
             role: NotificationRecipientRole.learner,
             scheduledAt: now,
@@ -146,7 +146,7 @@ class VerificationService {
           type: NotificationType.verificationApproved,
           title: 'Verification Approved',
           body: 'Your verification request for ${request.verificationType.displayName} has been approved. You now have a verified badge!',
-          sessionId: 'verif_${requestId}',
+          sessionId: 'verif_$requestId',
           createdAt: now,
         )
       );
@@ -194,7 +194,7 @@ class VerificationService {
       await NotificationService.instance.createIfAbsent(
         AppNotification(
           id: AppNotification.buildId(
-            sessionId: 'verif_${requestId}',
+            sessionId: 'verif_$requestId',
             type: NotificationType.verificationRejected,
             role: NotificationRecipientRole.learner,
             scheduledAt: now,
@@ -204,7 +204,7 @@ class VerificationService {
           type: NotificationType.verificationRejected,
           title: 'Verification Rejected',
           body: 'Your verification request for ${request.verificationType.displayName} was rejected. Reason: $rejectionReason',
-          sessionId: 'verif_${requestId}',
+          sessionId: 'verif_$requestId',
           createdAt: now,
         )
       );

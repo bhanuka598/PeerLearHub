@@ -293,7 +293,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -306,7 +306,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: activity.getActionColor().withOpacity(0.1),
+              color: activity.getActionColor().withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(

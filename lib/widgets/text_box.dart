@@ -54,7 +54,7 @@ class _TextBoxState extends State<TextBox> {
           widget.label,
           style: textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: colorScheme.onBackground,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -66,7 +66,7 @@ class _TextBoxState extends State<TextBox> {
               borderRadius: BorderRadius.circular(AppRadius.md),
               boxShadow: [
                 BoxShadow(
-                  color: colorScheme.primary.withOpacity(_isFocused ? 0.3 : 0.1),
+                  color: colorScheme.primary.withValues(alpha: _isFocused ? 0.3 : 0.1),
                   blurRadius: _isFocused ? 12 : 4,
                   offset: Offset(0, _isFocused ? 4 : 2),
                 ),
@@ -77,13 +77,13 @@ class _TextBoxState extends State<TextBox> {
               obscureText: widget.obscureText,
               focusNode: _focusNode,
               style: textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onBackground,
+                color: colorScheme.onSurface,
               ),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: colorScheme.surface,
                 hintStyle: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.5),
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
@@ -92,14 +92,14 @@ class _TextBoxState extends State<TextBox> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(
-                    color: colorScheme.primary.withOpacity(0.3),
+                    color: colorScheme.primary.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   borderSide: BorderSide(
-                    color: colorScheme.primary.withOpacity(0.2),
+                    color: colorScheme.primary.withValues(alpha: 0.2),
                     width: 1.5,
                   ),
                 ),

@@ -122,6 +122,20 @@ class AppAuth extends ChangeNotifier {
     }
   }
 
+  static bool _isParameterizedSkillProviderRoute(String location) {
+    return location.startsWith('/skill-provider/lesson/') &&
+        (location.endsWith('/manage') ||
+            location.contains('/module/') &&
+                (location.endsWith('/quiz') ||
+                    location.endsWith('/assignment')));
+  }
+
+  static bool _isParameterizedLearningAssessmentRoute(String location) {
+    return location.startsWith('/learning/lesson/') &&
+        location.contains('/module/') &&
+        (location.endsWith('/quiz') || location.endsWith('/assignment'));
+  }
+
   bool canAccess(String location) {
     final cleanLocation = location.split('?').first;
     const allowedForGuest = [
@@ -150,7 +164,9 @@ class AppAuth extends ChangeNotifier {
             cleanLocation == '/learning/provider-lesson' ||
             cleanLocation == '/profile' ||
             cleanLocation == '/skill-exchange' ||
-            _skillProviderRoutes.contains(cleanLocation);
+            _skillProviderRoutes.contains(cleanLocation) ||
+            _isParameterizedSkillProviderRoute(cleanLocation) ||
+            _isParameterizedLearningAssessmentRoute(cleanLocation);
       case AppUserRole.moderator:
         return cleanLocation == '/moderation' ||
             cleanLocation == '/learning/course' ||

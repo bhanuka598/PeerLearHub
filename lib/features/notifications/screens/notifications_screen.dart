@@ -50,6 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     
     if (notification.type == NotificationType.verificationApproved ||
         notification.type == NotificationType.verificationRejected) {
+      if (!mounted) return;
       context.push('/profile');
       return;
     }

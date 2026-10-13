@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:typed_data';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -16,10 +17,12 @@ import '../../skill_provider/widgets/status_chip.dart';
 import '../data/student_lesson_store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/assignment_service.dart';
+import '../../skill_provider/models/assessment_status.dart';
+import '../../skill_provider/services/assignment_service.dart';
+import '../../skill_provider/services/quiz_service.dart';
 import '../../moderation/models/moderation_report.dart';
 import '../../moderation/services/moderation_service.dart';
 
@@ -55,6 +58,9 @@ class _StudentLessonDetailsScreenState
   final _assignmentGithubController = TextEditingController();
   bool _submittingAssignment = false;
   bool _assignmentSubmitted = false;
+  bool _hasPublishedQuiz = false;
+  bool _hasPublishedAssignment = false;
+  static const _mainModuleId = 'main';
 
   Lesson get lesson => _lesson;
 
@@ -88,6 +94,27 @@ class _StudentLessonDetailsScreenState
     }
     await _loadReviews();
     await _loadVideoProgress();
+    await _loadPublishedAssessments();
+  }
+
+  Future<void> _loadPublishedAssessments() async {
+    try {
+      final quiz = await QuizService.instance.getQuizForModule(
+        lesson.id,
+        _mainModuleId,
+      );
+      final assignment = await ProviderAssignmentService.instance
+          .getAssignmentForModule(lesson.id, _mainModuleId);
+      if (!mounted) return;
+      setState(() {
+        _hasPublishedQuiz =
+            quiz != null && quiz.status == AssessmentStatus.published;
+        _hasPublishedAssignment = assignment != null &&
+            assignment.status == AssessmentStatus.published;
+      });
+    } catch (_) {
+      // Assessments are optional; ignore load errors.
+    }
   }
 
   Lesson _mergeLesson(Lesson passed, Lesson fetched) {
@@ -390,6 +417,11 @@ class _StudentLessonDetailsScreenState
                               rawUrl: lesson.youtubePlaylistUrl!,
                             ),
                           ),
+                        ],
+                        if (_enrolled &&
+                            (_hasPublishedQuiz || _hasPublishedAssignment)) ...[
+                          const SizedBox(height: 16),
+                          _authoredAssessmentsCard(),
                         ],
                         if (_enrolled) ...[
                           const SizedBox(height: 16),
@@ -802,6 +834,69 @@ class _StudentLessonDetailsScreenState
                   .map((review) => ReviewCard(review: review))
                   .toList(),
             ),
+    );
+  }
+
+  Widget _authoredAssessmentsCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.iconBackground,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.school_outlined,
+                  color: AppTheme.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Teacher assessments',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Your teacher has published assessments for this lesson.',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          if (_hasPublishedQuiz)
+            FilledButton.icon(
+              onPressed: () => context.push(
+                '/learning/lesson/${lesson.id}/module/$_mainModuleId/quiz',
+              ),
+              icon: const Icon(Icons.quiz_outlined),
+              label: const Text('Take Quiz'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+              ),
+            ),
+          if (_hasPublishedQuiz && _hasPublishedAssignment)
+            const SizedBox(height: 8),
+          if (_hasPublishedAssignment)
+            OutlinedButton.icon(
+              onPressed: () => context.push(
+                '/learning/lesson/${lesson.id}/module/$_mainModuleId/assignment',
+              ),
+              icon: const Icon(Icons.assignment_outlined),
+              label: const Text('Submit Assignment'),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1600,10 +1695,10 @@ class _YoutubeLessonPlayerState extends State<_YoutubeLessonPlayer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_controller != null) ...[
+        if (_controller case final controller?) ...[
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: YoutubePlayer(controller: _controller!, aspectRatio: 16 / 9),
+            child: YoutubePlayer(controller: controller, aspectRatio: 16 / 9),
           ),
           const SizedBox(height: 12),
         ],

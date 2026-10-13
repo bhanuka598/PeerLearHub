@@ -1199,6 +1199,7 @@ class LessonFormState extends State<LessonForm> {
       exchangeType: data.exchangeType,
       learningMaterials: data.learningMaterials,
       youtubePlaylistUrl: data.youtubePlaylistUrl,
+      modules: widget.initialLesson?.modules ?? LessonModule.defaultModules(),
       createdAt: createdAt ?? widget.initialLesson?.createdAt ?? now,
       updatedAt: now,
     );

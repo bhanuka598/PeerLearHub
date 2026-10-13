@@ -4,7 +4,6 @@ import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/navigation_card.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/stat_card.dart';
 import 'package:peer_learn_hub/features/moderation/widgets/moderator_bottom_nav.dart';
-import 'package:peer_learn_hub/features/moderation/widgets/moderator_app_bar.dart';
 import '../../../core/constants/app_colors.dart';
 import '../services/verification_service.dart';
 import '../services/moderation_service.dart';
@@ -95,7 +94,7 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryTeal.withOpacity(0.15),
+                      color: AppColors.primaryTeal.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
