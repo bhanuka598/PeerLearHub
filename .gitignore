@@ -56,3 +56,4 @@ app.*.map.json
 backend/.env
 backend/.env.*
 !backend/.env.example
+android/build/reports/problems/problems-report.html
