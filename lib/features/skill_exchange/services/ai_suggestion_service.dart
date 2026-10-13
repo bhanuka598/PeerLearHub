@@ -313,10 +313,10 @@ Return ONLY raw JSON, with no markdown code fences or other text.
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data is Map && data['success'] == true && data['recommendations'] is List) {
-          final list = List<Map<String, dynamic>>.from(data['recommendations']);
-          if (list.isNotEmpty) {
-            return list;
+        if (data is Map && data['success'] == true) {
+          final feedList = data['feed'] ?? data['recommendations'];
+          if (feedList is List && feedList.isNotEmpty) {
+            return List<Map<String, dynamic>>.from(feedList);
           }
         }
       }
@@ -324,39 +324,88 @@ Return ONLY raw JSON, with no markdown code fences or other text.
       debugPrint('Gemini recommendation service error: $e');
     }
 
-    // Heuristic Fallback based on completed/enrolled lessons & courses
+    // Heuristic Fallback matching Learner Goal, Skill Level, Interests & Past Searches
+    final goal = (learnerProfile['learningGoal'] ?? learnerProfile['goal'] ?? '').toString().toLowerCase();
+    final skillLevel = (learnerProfile['skillLevel'] ?? learnerProfile['level'] ?? 'Beginner').toString().toLowerCase();
+    final interests = (learnerProfile['interests'] as List?)
+            ?.map((e) => e.toString().toLowerCase())
+            .toList() ??
+        <String>[];
+    final pastSearches = (learnerProfile['searchHistory'] as List?)
+            ?.map((e) => e.toString().toLowerCase())
+            .toList() ??
+        <String>[];
+
     final completed = (learnerProfile['completedLessons'] as List?)?.map((e) => e.toString()).toSet() ?? {};
     final enrolled = (learnerProfile['enrolledLessons'] as List?)?.map((e) => e.toString()).toSet() ?? {};
 
-    final List<Map<String, dynamic>> fallback = [];
+    final List<Map<String, dynamic>> scoredCourses = [];
+
     for (final c in courses) {
-      if (c is Map && c['id'] != null) {
-        final cid = c['id'].toString();
-        if (!completed.contains(cid)) {
-          fallback.add({
-            'courseId': cid,
-            'reasoning': enrolled.contains(cid)
-                ? 'Continue your progress in this enrolled course to master new skills.'
-                : 'Recommended based on your completed lessons and learning path synergy.',
-          });
-          if (fallback.length >= 2) {
-            break;
-          }
-        }
+      if (c is! Map || c['id'] == null) continue;
+      final cid = c['id'].toString();
+      if (completed.contains(cid)) continue;
+
+      final title = (c['title'] ?? '').toString().toLowerCase();
+      final category = (c['category'] ?? '').toString().toLowerCase();
+      final cLevel = (c['level'] ?? '').toString().toLowerCase();
+      final tags = (c['tags'] as List?)?.map((t) => t.toString().toLowerCase()).toList() ?? <String>[];
+      final fullText = '$title $category ${tags.join(' ')}';
+
+      double score = 50.0;
+      final List<String> reasons = [];
+      String section = 'trending';
+
+      // 1. Goal alignment
+      if (goal.isNotEmpty && (fullText.contains(goal) || goal.split(' ').any((w) => w.length > 3 && fullText.contains(w)))) {
+        score += 25.0;
+        reasons.add('Matches your goal: "${learnerProfile['learningGoal'] ?? learnerProfile['goal']}"');
+        section = 'goal';
       }
+
+      // 2. Skill level match
+      if (skillLevel.isNotEmpty && cLevel.contains(skillLevel)) {
+        score += 15.0;
+        reasons.add('Suitable for your $cLevel level');
+      }
+
+      // 3. Interests alignment
+      final matchingInterests = interests.where((item) => fullText.contains(item)).toList();
+      if (matchingInterests.isNotEmpty) {
+        score += (matchingInterests.length * 10.0).clamp(10.0, 20.0);
+        reasons.add('Aligned with your interest in ${matchingInterests.join(', ')}');
+        if (section != 'goal') section = 'interests';
+      }
+
+      // 4. Past searches match
+      final matchingSearches = pastSearches.where((q) => fullText.contains(q) || q.split(' ').any((w) => w.length > 3 && fullText.contains(w))).toList();
+      if (matchingSearches.isNotEmpty) {
+        score += 15.0;
+        reasons.add('Based on your past search "${matchingSearches.first}"');
+        if (section != 'goal') section = 'past_search';
+      }
+
+      // 5. In-progress continuation
+      if (enrolled.contains(cid)) {
+        score += 10.0;
+        reasons.insert(0, 'Continue your enrolled course progress');
+        section = 'continue';
+      }
+
+      final finalScore = score.clamp(50.0, 99.0).toInt();
+      final reasoning = reasons.isNotEmpty
+          ? reasons.join(' • ')
+          : 'Recommended based on trending peer skills and curriculum topics.';
+
+      scoredCourses.add({
+        'courseId': cid,
+        'matchScore': finalScore,
+        'section': section,
+        'reasoning': reasoning,
+      });
     }
 
-    if (fallback.isEmpty && courses.isNotEmpty) {
-      for (final c in courses.take(2)) {
-        if (c is Map && c['id'] != null) {
-          fallback.add({
-            'courseId': c['id'].toString(),
-            'reasoning': 'Recommended based on popular peer learning trends and skill development goals.',
-          });
-        }
-      }
-    }
-
-    return fallback;
+    scoredCourses.sort((a, b) => (b['matchScore'] as int).compareTo(a['matchScore'] as int));
+    return scoredCourses.take(6).toList();
   }
 }

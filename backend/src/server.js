@@ -542,51 +542,74 @@ app.post('/api/ai/match-suggestions', async (req, res) => {
   }
 });
 
-// AI Personalized Course Recommendations endpoint
+// AI Personalized Course Feed endpoint
 app.post('/api/ai/recommendations', async (req, res) => {
   try {
     const { profile, courses } = req.body ?? {};
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        message: 'GEMINI_API_KEY is not configured in backend .env',
-      });
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY missing' });
+    }
+    if (!Array.isArray(courses) || courses.length === 0) {
+      return res.json({ success: true, feed: [] });
     }
 
     const prompt = `
-You are an expert AI Learning Advisor. Analyze this learner's profile, including their completed lessons/assignments in 'My lessons' (completedLessons) and enrolled courses (enrolledLessons), and recommend the top 2 courses from the provided list that best build upon their completed learning history, interests, and next steps in their learning path.
+You are an AI Learning Advisor for PeerLearn Hub. Build a personalized course feed
+for the learner below that precisely matches their learning goal, current skill level,
+interests, and recent search queries.
 
-Learner Profile:
-${JSON.stringify(profile)}
+LEARNER PROFILE:
+${JSON.stringify(profile, null, 2)}
 
-Available Courses:
-${JSON.stringify(courses)}
+AVAILABLE COURSES:
+${JSON.stringify(courses, null, 2)}
 
-Return ONLY a raw JSON array of objects with this format (no markdown code fences):
-[
-  {
-    "courseId": "id_here",
-    "reasoning": "Personalized 1-2 sentence reason referencing their completed lessons or learning history and why this next course matches them."
-  }
-]
+Rules:
+- Recommend at most 6 unique courses total.
+- Match candidate courses against:
+  1) Learner's goal (career/skill ambition)
+  2) Learner's skill level (Beginner / Intermediate / Advanced)
+  3) Learner's selected interests & topic tags
+  4) Learner's past searches / search history
+- Each recommendation MUST have a distinct "section" from:
+  "goal", "skill_level", "interests", "past_search", "continue", "trending".
+- "goal" = directly aligns with the learner's stated goal or career path.
+- "skill_level" = ideally pitched at their current skill level tier.
+- "interests" = matches their explicit topic interests.
+- "past_search" = matches topics they recently searched for.
+- "continue" = courses currently enrolled in with pending progress.
+- "trending" = popular peer learning courses.
+- Skip courses the learner has already completed (progress == 100).
+- Give each a matchScore (integer 60-99) and a concise 1-sentence personalized reasoning explaining why it matches their goal, level, interests, or past searches.
+
+Return ONLY a raw JSON object with this exact shape (no markdown fences):
+{
+  "feed": [
+    {
+      "courseId": "string",
+      "section": "goal",
+      "matchScore": 92,
+      "reasoning": "1-sentence personal reason."
+    }
+  ]
+}
 `;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+        generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
       }),
     });
 
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
-      console.error('Gemini recommendations API error:', geminiResponse.status, errText);
+      console.error('Gemini feed error:', geminiResponse.status, errText);
       return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
     }
 
@@ -594,16 +617,16 @@ Return ONLY a raw JSON array of objects with this format (no markdown code fence
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    let parsed = [];
+    let parsed = { feed: [] };
     try {
       parsed = JSON.parse(cleanJson);
     } catch (e) {
-      console.warn('Failed to parse Gemini recommendation JSON:', cleanJson);
+      console.warn('Failed to parse feed JSON:', cleanJson);
     }
 
-    return res.json({ success: true, recommendations: parsed });
+    return res.json({ success: true, feed: parsed.feed ?? [] });
   } catch (error) {
-    console.error('AI recommendation error:', error);
+    console.error('AI feed error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 });

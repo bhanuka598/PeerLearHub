@@ -58,19 +58,56 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
   }
 
+  List<String> _userInterests = [];
+  String _userGoal = '';
+  String _userSkillLevel = 'Beginner';
+  List<String> _userSearchHistory = [];
+
+  Future<void> _recordSearchQuery(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        await userRef.set({
+          'searchHistory': FieldValue.arrayUnion([trimmed.toLowerCase()]),
+          'lastSearchedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        if (!_userSearchHistory.contains(trimmed.toLowerCase())) {
+          _userSearchHistory.insert(0, trimmed.toLowerCase());
+          if (_userSearchHistory.length > 8) _userSearchHistory.removeLast();
+        }
+      } catch (e) {
+        debugPrint('Error recording search query: $e');
+      }
+    }
+    // Re-trigger personalized recommendations with updated search signal
+    _loadAiRecommendations(LearningStore.instance.value);
+  }
+
   Future<void> _loadAiRecommendations(List<LearningCourse> courses) async {
     final user = FirebaseAuth.instance.currentUser;
     Map<String, dynamic> learnerProfile = {
       'uid': user?.uid ?? 'guest',
       'email': user?.email ?? '',
       'displayName': user?.displayName ?? 'Learner',
+      'learningGoal': _userGoal,
+      'skillLevel': _userSkillLevel,
+      'interests': _userInterests,
+      'searchHistory': _userSearchHistory,
     };
 
     if (user != null) {
       try {
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists) {
-          learnerProfile.addAll(doc.data() ?? {});
+          final data = doc.data() ?? {};
+          learnerProfile.addAll(data);
+          _userGoal = (data['learningGoal'] ?? data['goal'] ?? '').toString();
+          _userSkillLevel = (data['skillLevel'] ?? data['level'] ?? 'Beginner').toString();
+          _userInterests = (data['interests'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          _userSearchHistory = (data['searchHistory'] as List?)?.map((e) => e.toString()).toList() ?? [];
         }
 
         final assignmentsSnap = await FirebaseFirestore.instance
@@ -180,6 +217,129 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }).toList();
   }
 
+  void _showPreferenceTunerDialog() {
+    final goalController = TextEditingController(text: _userGoal);
+    String selectedLevel = _userSkillLevel;
+    final Set<String> currentInterests = Set<String>.from(_userInterests);
+    const availableInterests = [
+      'Mobile Development',
+      'Flutter',
+      'Python',
+      'UI/UX Design',
+      'Web Development',
+      'Cloud & DevOps',
+      'Cyber Security',
+      'Artificial Intelligence',
+      'Data Science',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.tune_rounded, color: AppTheme.primaryColor),
+                SizedBox(width: 8),
+                Text('Customize My Learning', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Learning Goal / Career Ambition', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: goalController,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. Become a Mobile Developer',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Your Current Skill Level', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: ['Beginner', 'Intermediate', 'Advanced'].contains(selectedLevel) ? selectedLevel : 'Beginner',
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: ['Beginner', 'Intermediate', 'Advanced']
+                        .map((lvl) => DropdownMenuItem(value: lvl, child: Text(lvl)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedLevel = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Topic Interests', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: availableInterests.map((interest) {
+                      final isSelected = currentInterests.contains(interest);
+                      return FilterChip(
+                        label: Text(interest, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : AppTheme.textPrimary)),
+                        selected: isSelected,
+                        selectedColor: AppTheme.primaryColor,
+                        checkmarkColor: Colors.white,
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              currentInterests.add(interest);
+                            } else {
+                              currentInterests.remove(interest);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final newGoal = goalController.text.trim();
+                  Navigator.pop(ctx);
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                      'learningGoal': newGoal,
+                      'skillLevel': selectedLevel,
+                      'interests': currentInterests.toList(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+                  }
+                  if (mounted) {
+                    setState(() {
+                      _userGoal = newGoal;
+                      _userSkillLevel = selectedLevel;
+                      _userInterests = currentInterests.toList();
+                    });
+                    _loadAiRecommendations(LearningStore.instance.value);
+                  }
+                },
+                child: const Text('Save & Update Feed'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   String get _firstName {
     final name = FirebaseAuth.instance.currentUser?.displayName?.trim();
     if (name == null || name.isEmpty) return '';
@@ -232,6 +392,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       searchController: _searchController,
                       onQueryChanged: (value) =>
                           setState(() => _query = value),
+                      onSubmitted: (value) => _recordSearchQuery(value),
                       onProfile: () => context.go('/profile'),
                       onLogout: () {
                         AppAuth.instance.logout();
@@ -243,6 +404,145 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
+                        // Personalized Learner Goal & Interests Summary Banner
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.track_changes_rounded,
+                                      color: AppTheme.primaryColor,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Personalized For You',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          _userGoal.isNotEmpty
+                                              ? 'Goal: $_userGoal • Level: $_userSkillLevel'
+                                              : 'Set your learning goal to get tailored courses',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    ),
+                                    onPressed: _showPreferenceTunerDialog,
+                                    icon: const Icon(Icons.tune_rounded, size: 16),
+                                    label: const Text('Edit Goal', style: TextStyle(fontSize: 12)),
+                                  ),
+                                ],
+                              ),
+                              if (_userInterests.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: _userInterests.map((interest) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '#$interest',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primaryColor,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                              if (_userSearchHistory.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.history_rounded, size: 14, color: AppTheme.textSecondary),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Recent searches: ',
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                    ),
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
+                                          children: _userSearchHistory.take(3).map((term) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(right: 6),
+                                              child: InkWell(
+                                                onTap: () {
+                                                  _searchController.text = term;
+                                                  setState(() => _query = term);
+                                                },
+                                                child: Text(
+                                                  '"$term"',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppTheme.primaryColor,
+                                                    decoration: TextDecoration.underline,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                         const _DiscoverSectionHeader(
                           title: 'Categories',
                           subtitle: 'Filter by what you want to learn',
@@ -318,8 +618,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           ),
                         const SizedBox(height: 24),
                         const _DiscoverSectionHeader(
-                          title: '✨ Recommended For You',
-                          subtitle: 'Personalized based on your learner profile & goals',
+                          title: '✨ Personalized Course Feed',
+                          subtitle: 'Courses matching your goal, skill level, and interests',
                         ),
                         const SizedBox(height: 12),
                         if (_loadingAiRecommendations)
@@ -332,55 +632,122 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             ),
                           )
                         else if (_aiRecommendations.isEmpty)
-                          const Text(
-                            'Complete your profile and enroll in courses to get AI-powered recommendations.',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: AppTheme.textSecondary),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Set your learning goals and search for topics to view tailored course suggestions.',
+                                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
                           )
                         else
                           ..._aiRecommendations.map((rec) {
                             final courseId = rec['courseId']?.toString();
                             final reasoning = rec['reasoning']?.toString() ?? '';
+                            final matchScore = rec['matchScore'] ?? 85;
+                            final section = rec['section']?.toString() ?? 'goal';
                             final course = courses.firstWhere(
                               (c) => c.id == courseId,
                               orElse: () => courses.first,
                             );
+
+                            String badgeText = 'Top Goal Match';
+                            IconData badgeIcon = Icons.auto_awesome;
+                            Color badgeColor = AppTheme.primaryColor;
+
+                            if (section == 'past_search') {
+                              badgeText = 'Based on Recent Search';
+                              badgeIcon = Icons.search_rounded;
+                              badgeColor = Colors.deepOrange;
+                            } else if (section == 'interests') {
+                              badgeText = 'Matched with Interests';
+                              badgeIcon = Icons.favorite_border_rounded;
+                              badgeColor = Colors.purple;
+                            } else if (section == 'skill_level') {
+                              badgeText = 'Fits Skill Level';
+                              badgeIcon = Icons.trending_up_rounded;
+                              badgeColor = Colors.teal;
+                            } else if (section == 'continue') {
+                              badgeText = 'Continue Enrolled Path';
+                              badgeIcon = Icons.play_arrow_rounded;
+                              badgeColor = Colors.blue;
+                            }
+
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: AppTheme.primaryColor.withValues(alpha: 0.06),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                                color: badgeColor.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: badgeColor.withValues(alpha: 0.25)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.auto_awesome, color: AppTheme.primaryColor, size: 20),
-                                      const SizedBox(width: 8),
-                                      const Expanded(
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: badgeColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(badgeIcon, color: badgeColor, size: 14),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              badgeText,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: badgeColor,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
                                         child: Text(
-                                          'AI Match Reason',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.primaryColor,
-                                            fontSize: 13,
+                                          '$matchScore% Match',
+                                          style: const TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 8),
                                   Text(
                                     reasoning,
                                     style: const TextStyle(
                                       color: AppTheme.textPrimary,
-                                      fontSize: 13,
-                                      height: 1.4,
+                                      fontSize: 12.5,
+                                      height: 1.35,
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 10),
                                   CourseCard(
                                     course: course,
                                     onTap: () => context.push(
@@ -2069,6 +2436,7 @@ class _DiscoverHeader extends StatelessWidget {
     required this.greeting,
     required this.searchController,
     required this.onQueryChanged,
+    this.onSubmitted,
     required this.onProfile,
     required this.onLogout,
   });
@@ -2076,6 +2444,7 @@ class _DiscoverHeader extends StatelessWidget {
   final String greeting;
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback onProfile;
   final VoidCallback onLogout;
 
@@ -2147,6 +2516,7 @@ class _DiscoverHeader extends StatelessWidget {
               TextField(
                 controller: searchController,
                 onChanged: onQueryChanged,
+                onSubmitted: onSubmitted,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search lessons, skills, or topics',
