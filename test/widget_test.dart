@@ -1,12 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:peer_learn_hub/core/auth/app_auth.dart';
 import 'package:peer_learn_hub/main.dart';
+import 'package:peer_learn_hub/screens/splash_screen.dart';
 
 void main() {
-  testWidgets('PeerLearnHub welcome screen shows the onboarding content', (
+  testWidgets('PeerLearnHub splash then shows the welcome screen', (
     WidgetTester tester,
   ) async {
+    SplashScreen.hasCompleted = false;
     await tester.pumpWidget(const PeerLearnHub());
+    await tester.pump();
+
+    expect(find.text('PeerLearnHub'), findsOneWidget);
+    expect(find.text('Preparing your learning space'), findsOneWidget);
+
     await tester.pumpAndSettle();
 
     expect(find.text('PeerLearnHub'), findsOneWidget);
@@ -17,5 +25,14 @@ void main() {
       find.text('Learn skills. Connect with people. Grow together.'),
       findsOneWidget,
     );
+  });
+
+  test('moderator login resolves to the moderator dashboard route', () {
+    AppAuth.instance.setRoleFromApi('moderator');
+
+    expect(AppAuth.instance.currentRole, AppUserRole.moderator);
+    expect(AppAuth.instance.getHomeRoute(), '/moderation');
+
+    AppAuth.instance.setRole(AppUserRole.student);
   });
 }

@@ -49,6 +49,19 @@ extension LessonTypeDisplay on LessonType {
   }
 }
 
+extension ExchangeTypeDisplay on ExchangeType {
+  String get label {
+    switch (this) {
+      case ExchangeType.free:
+        return 'Free';
+      case ExchangeType.paid:
+        return 'Paid';
+      case ExchangeType.skillExchange:
+        return 'Skill Exchange';
+    }
+  }
+}
+
 extension LessonStatusDisplay on LessonStatus {
   String get label {
     switch (this) {

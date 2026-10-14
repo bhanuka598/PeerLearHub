@@ -9,9 +9,9 @@ class DefaultFirebaseOptions {
       return web;
     }
     switch (defaultTargetPlatform) {
-      /*case TargetPlatform.android:
+      case TargetPlatform.android:
         return android;
-      case TargetPlatform.iOS:
+      /*case TargetPlatform.iOS:
         return ios;*/
       case TargetPlatform.macOS:
         throw UnsupportedError(
@@ -25,13 +25,13 @@ class DefaultFirebaseOptions {
     }
   }
 
-  /*static const FirebaseOptions android = FirebaseOptions(
+  static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyD3n63w46s_EiUTdbCCXhkzZbIR6hiQmGA',
     appId: '1:536687852853:android:5b342c3bb3c3447682e07c',
     messagingSenderId: '536687852853',
     projectId: 'peerlearnhub-d7db3',
     storageBucket: 'peerlearnhub-d7db3.firebasestorage.app',
-  );*/
+  );
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: "AIzaSyCXH4zUH0lEGIipgJb-L_vLxrvLa2TCm8U",

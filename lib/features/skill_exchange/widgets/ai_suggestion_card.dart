@@ -123,9 +123,21 @@ class AISuggestionCard extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'By ${target.ownerName} (${target.ownerRole.name.toUpperCase()})',
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'By ${target.ownerName} (${target.ownerRole.name.toUpperCase()})',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (target.isOwnerVerified) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified, size: 14, color: Colors.blue),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Row(

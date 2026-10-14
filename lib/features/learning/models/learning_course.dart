@@ -12,6 +12,20 @@ class CourseModule {
   final String duration;
 }
 
+class MiniVideoLesson {
+  const MiniVideoLesson({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.duration,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final String duration;
+}
+
 class LearningCourse {
   const LearningCourse({
     required this.id,
@@ -22,10 +36,14 @@ class LearningCourse {
     required this.instructor,
     required this.duration,
     required this.rating,
+    this.isInstructorVerified = false,
     required this.colorValue,
     required this.modules,
+    this.videoLessons = const [],
     this.enrolled = false,
     this.progress = 0,
+    this.enrollmentCount = 0,
+    this.createdAt,
   });
 
   final String id;
@@ -36,12 +54,21 @@ class LearningCourse {
   final String instructor;
   final String duration;
   final double rating;
+  final bool isInstructorVerified;
   final int colorValue;
   final List<CourseModule> modules;
+  final List<MiniVideoLesson> videoLessons;
   final bool enrolled;
   final int progress;
+  final int enrollmentCount;
+  final DateTime? createdAt;
 
-  LearningCourse copyWith({bool? enrolled, int? progress}) => LearningCourse(
+  LearningCourse copyWith({
+    bool? enrolled,
+    int? progress,
+    int? enrollmentCount,
+    DateTime? createdAt,
+  }) => LearningCourse(
         id: id,
         title: title,
         description: description,
@@ -50,9 +77,13 @@ class LearningCourse {
         instructor: instructor,
         duration: duration,
         rating: rating,
+        isInstructorVerified: isInstructorVerified,
         colorValue: colorValue,
         modules: modules,
+        videoLessons: videoLessons,
         enrolled: enrolled ?? this.enrolled,
         progress: progress ?? this.progress,
+        enrollmentCount: enrollmentCount ?? this.enrollmentCount,
+        createdAt: createdAt ?? this.createdAt,
       );
 }

@@ -10,12 +10,12 @@ class DropdownMenu extends StatefulWidget {
   final ValueChanged<String?> onChanged;
 
   const DropdownMenu({
-    Key? key,
+    super.key,
     required this.label,
     required this.options,
     this.selectedOption,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<DropdownMenu> createState() => _DropdownMenuState();
@@ -57,7 +57,7 @@ class _DropdownMenuState extends State<DropdownMenu> {
           widget.label,
           style: textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: colorScheme.onBackground,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -69,7 +69,7 @@ class _DropdownMenuState extends State<DropdownMenu> {
               borderRadius: BorderRadius.circular(AppRadius.md),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryColor.withOpacity(_isFocused ? 0.3 : 0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: _isFocused ? 0.3 : 0.1),
                   blurRadius: _isFocused ? 12 : 4,
                   offset: Offset(0, _isFocused ? 4 : 2),
                 ),
@@ -82,7 +82,7 @@ class _DropdownMenuState extends State<DropdownMenu> {
                 border: Border.all(
                   color: _isFocused
                       ? AppTheme.primaryColor
-                      : AppTheme.primaryColor.withOpacity(0.3),
+                      : AppTheme.primaryColor.withValues(alpha: 0.3),
                   width: _isFocused ? 2 : 1.5,
                 ),
                 borderRadius: BorderRadius.circular(AppRadius.md),
@@ -93,7 +93,7 @@ class _DropdownMenuState extends State<DropdownMenu> {
                   isExpanded: true,
                   focusNode: _focusNode,
                   style: textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onBackground,
+                    color: colorScheme.onSurface,
                   ),
                   icon: Icon(
                     Icons.arrow_drop_down,

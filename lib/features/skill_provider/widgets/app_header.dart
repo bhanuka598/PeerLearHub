@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/role_switcher_button.dart';
+import '../../notifications/widgets/notification_bell_button.dart';
+import '../utils/profile_image.dart';
 
 /// Teal gradient header for the Skill Provider Dashboard.
 class TealDashboardHeader extends StatelessWidget {
@@ -12,6 +14,9 @@ class TealDashboardHeader extends StatelessWidget {
     required this.welcomeSubtitle,
     this.onRefresh,
     this.onLogout,
+    this.profileImageUrl,
+    this.profileInitial = 'T',
+    this.onProfileTap,
   });
 
   final String title;
@@ -19,6 +24,9 @@ class TealDashboardHeader extends StatelessWidget {
   final String welcomeSubtitle;
   final VoidCallback? onRefresh;
   final VoidCallback? onLogout;
+  final String? profileImageUrl;
+  final String profileInitial;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -26,11 +34,12 @@ class TealDashboardHeader extends StatelessWidget {
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: AppTheme.headerGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -39,42 +48,58 @@ class TealDashboardHeader extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
                   ),
-                  // Role switcher always visible; onDark=true adapts colours
+                  const NotificationBellButton(onDark: true),
                   const RoleSwitcherButton(onDark: true),
-                  if (onRefresh != null)
-                    IconButton(
-                      onPressed: onRefresh,
-                      icon: const Icon(Icons.refresh, color: Colors.white),
-                      tooltip: 'Refresh',
-                    ),
                   if (onLogout != null)
                     IconButton(
+                      visualDensity: VisualDensity.compact,
                       onPressed: onLogout,
                       icon: const Icon(Icons.logout, color: Colors.white),
                       tooltip: 'Logout',
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                welcomeTitle,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          welcomeTitle,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          welcomeSubtitle,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                height: 1.35,
+                              ),
+                        ),
+                      ],
                     ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                welcomeSubtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _HeaderProfileAvatar(
+                    imageUrl: profileImageUrl,
+                    initial: profileInitial,
+                    onTap: onProfileTap,
+                  ),
+                ],
               ),
             ],
           ),
@@ -82,6 +107,51 @@ class TealDashboardHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HeaderProfileAvatar extends StatelessWidget {
+  const _HeaderProfileAvatar({
+    required this.imageUrl,
+    required this.initial,
+    this.onTap,
+  });
+
+  final String? imageUrl;
+  final String initial;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ProfileAvatar(
+            size: 52,
+            imageUrl: imageUrl,
+            initial: initial,
+            backgroundColor: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
 }
 
 /// Teal app bar for sub-pages (My Lessons, Create, Edit).

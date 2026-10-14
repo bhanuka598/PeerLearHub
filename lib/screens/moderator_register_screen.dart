@@ -19,11 +19,9 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _adminKeyController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _obscureAdminKey = true;
   bool _isSubmitting = false;
   bool _agreedToTerms = false;
 
@@ -33,7 +31,6 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _adminKeyController.dispose();
     super.dispose();
   }
 
@@ -77,13 +74,6 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
     return null;
   }
 
-  String? _validateAdminKey(String? value) {
-    if ((value ?? '').trim().isEmpty) {
-      return 'Please enter the admin key';
-    }
-    return null;
-  }
-
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
@@ -108,32 +98,28 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      // First register the user normally
       await AuthService.instance.registerWithEmail(
         fullName: _fullNameController.text,
         email: _emailController.text,
         password: _passwordController.text,
         learningGoal: 'Moderation and Content Management',
+        role: 'moderator',
       );
-      
+
       if (!mounted) {
         return;
       }
 
-      // Then register as moderator with admin key
-      final success = await AppAuth.instance.registerAsModerator(
-        adminKey: _adminKeyController.text.trim(),
-      );
+      await AppAuth.instance.registerAsModerator();
+      if (!mounted) {
+        return;
+      }
 
-      if (success && mounted) {
-        _showSuccess('Successfully registered as moderator!');
-        // Small delay to show success message
-        await Future.delayed(const Duration(seconds: 1));
-        if (mounted) {
-          context.go(AppAuth.instance.getHomeRoute());
-        }
-      } else if (mounted) {
-        _showError('Failed to register as moderator. Please check your admin key.');
+      AppAuth.instance.setRole(AppUserRole.moderator);
+      _showSuccess('Successfully registered as moderator!');
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) {
+        context.go(AppAuth.instance.getHomeRoute());
       }
     } on FirebaseAuthException catch (error) {
       if (mounted) {
@@ -251,7 +237,8 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
-                        textInputAction: TextInputAction.next,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _registerModerator(),
                         decoration: InputDecoration(
                           labelText: 'Confirm Password',
                           hintText: 'Confirm your password',
@@ -271,31 +258,6 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
                           ),
                         ),
                         validator: _validateConfirmPassword,
-                      ),
-                      const SizedBox(height: 18),
-                      TextFormField(
-                        controller: _adminKeyController,
-                        obscureText: _obscureAdminKey,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _registerModerator(),
-                        decoration: InputDecoration(
-                          labelText: 'Admin Key',
-                          hintText: 'Enter the admin key',
-                          prefixIcon: const Icon(Icons.key),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(
-                                () => _obscureAdminKey = !_obscureAdminKey,
-                              );
-                            },
-                            icon: Icon(
-                              _obscureAdminKey
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: _validateAdminKey,
                       ),
                       const SizedBox(height: 16),
                       CheckboxListTile(

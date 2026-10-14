@@ -75,35 +75,110 @@ class VerificationRequest {
 
   // Convert from Firestore document
   factory VerificationRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final evidenceUrls = _asStringList(
+      data['evidenceUrls'] ?? data['evidence'] ?? data['documents'],
+    );
+    final identityUrls = _asStringList(data['identityDocumentUrl']);
+    final identityDocumentUrl = _asNullableString(data['identityDocumentUrl']) ??
+        (identityUrls.isNotEmpty ? identityUrls.first : null);
+
     return VerificationRequest(
       id: doc.id,
-      userId: data['userId'] ?? '',
-      userName: data['userName'] ?? '',
-      userProfileImage: data['userProfileImage'],
+      userId: _asString(data['userId']),
+      userName: _asString(
+        data['userName'] ?? data['displayName'] ?? data['fullName'] ?? data['name'],
+      ),
+      userProfileImage: _asNullableString(
+        data['userProfileImage'] ?? data['profileImageUrl'] ?? data['photoURL'],
+      ),
       verificationType: VerificationType.values.firstWhere(
-        (e) => e.name == data['verificationType'],
+        (e) => e.name == _asString(data['verificationType']),
         orElse: () => VerificationType.identity,
       ),
-      fullName: data['fullName'],
-      identityDocumentUrl: data['identityDocumentUrl'],
-      skillName: data['skillName'],
-      experienceDescription: data['experienceDescription'],
-      evidenceUrls: data['evidenceUrls'] != null
-          ? List<String>.from(data['evidenceUrls'])
-          : null,
-      portfolioUrl: data['portfolioUrl'],
+      fullName: _asNullableString(data['fullName']),
+      identityDocumentUrl: identityDocumentUrl,
+      skillName: _asJoinedString(
+        data['skillName'] ?? data['skills'] ?? data['verifiedSkills'],
+      ),
+      experienceDescription: _asNullableString(data['experienceDescription']),
+      evidenceUrls: evidenceUrls.isEmpty ? null : evidenceUrls,
+      portfolioUrl: _asNullableString(data['portfolioUrl']),
       status: VerificationStatus.values.firstWhere(
-        (e) => e.name == data['status'],
+        (e) => e.name == _asString(data['status']),
         orElse: () => VerificationStatus.pending,
       ),
-      submittedAt: (data['submittedAt'] as Timestamp).toDate(),
-      reviewedAt: data['reviewedAt'] != null
-          ? (data['reviewedAt'] as Timestamp).toDate()
-          : null,
-      reviewedBy: data['reviewedBy'],
-      rejectionReason: data['rejectionReason'],
+      submittedAt: _asDateTime(data['submittedAt'] ?? data['createdAt']),
+      reviewedAt: _asNullableDateTime(data['reviewedAt']),
+      reviewedBy: _asNullableString(data['reviewedBy']),
+      rejectionReason: _asNullableString(data['rejectionReason']),
     );
+  }
+
+  static String _asString(dynamic value, [String fallback = '']) {
+    return _asNullableString(value) ?? fallback;
+  }
+
+  static String? _asJoinedString(dynamic value) {
+    if (value is List) {
+      final parts = value
+          .map(_asNullableString)
+          .whereType<String>()
+          .where((item) => item.isNotEmpty)
+          .toList();
+      if (parts.isEmpty) return null;
+      return parts.join(', ');
+    }
+    return _asNullableString(value);
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : value;
+    }
+    if (value is List) {
+      for (final item in value) {
+        final parsed = _asNullableString(item);
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+    if (value is Map) {
+      return _asNullableString(
+        value['url'] ?? value['name'] ?? value['value'] ?? value['text'],
+      );
+    }
+    return value.toString();
+  }
+
+  static List<String> _asStringList(dynamic value) {
+    if (value == null) return const [];
+    if (value is String) {
+      final parsed = value.trim();
+      return parsed.isEmpty ? const [] : [value];
+    }
+    if (value is List) {
+      return value
+          .map(_asNullableString)
+          .whereType<String>()
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  static DateTime _asDateTime(dynamic value) {
+    return _asNullableDateTime(value) ?? DateTime.now();
+  }
+
+  static DateTime? _asNullableDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 
   // Convert to Firestore document

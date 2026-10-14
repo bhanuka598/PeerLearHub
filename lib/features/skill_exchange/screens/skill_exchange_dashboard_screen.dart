@@ -173,6 +173,35 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Propose Swap'),
       ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 2,
+        onDestinationSelected: (value) {
+          if (value == 0) {
+            context.go('/learning');
+          } else if (value == 1) {
+            context.go('/learning/my-courses');
+          } else if (value == 2) {
+            context.go('/skill-exchange');
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Discover',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.play_lesson_outlined),
+            selectedIcon: Icon(Icons.play_lesson),
+            label: 'My Learning',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.swap_horiz_outlined),
+            selectedIcon: Icon(Icons.swap_horiz),
+            label: 'Skill Exchange',
+          ),
+        ],
+      ),
       body: _provider.isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F766E)))
           : TabBarView(
@@ -250,7 +279,9 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<ExchangeCourse>(
-                        value: _provider.selectedOfferedCourseForAI,
+                        value: myCourses.contains(_provider.selectedOfferedCourseForAI)
+                            ? _provider.selectedOfferedCourseForAI
+                            : (myCourses.isNotEmpty ? myCourses.first : null),
                         isExpanded: true,
                         icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0F766E)),
                         items: myCourses.map((c) {
@@ -313,6 +344,31 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
     final otherCourses = _provider.availableCourses
         .where((c) => c.ownerId != _provider.currentUser.id)
         .toList();
+
+    if (otherCourses.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.school_outlined, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              const Text(
+                'No external courses available yet',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'When other peers or instructors publish lessons, they will show up here for exchange.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 10),
