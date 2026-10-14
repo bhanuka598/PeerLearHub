@@ -151,6 +151,58 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
     }
   }
 
+  Widget _buildAvatar(String? imageUrl, String userName, {double size = 64}) {
+    if (imageUrl != null && imageUrl.trim().isNotEmpty && imageUrl.startsWith('http')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackAvatar(userName, size),
+        ),
+      );
+    }
+    return _fallbackAvatar(userName, size);
+  }
+
+  Widget _fallbackAvatar(String userName, double size) {
+    final initial = userName.trim().isNotEmpty ? userName.trim()[0].toUpperCase() : 'U';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryTeal,
+            const Color(0xFF0284C7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryTeal.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: size * 0.42,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM dd, yyyy');
@@ -219,13 +271,7 @@ class _VerificationDetailsScreenState extends State<VerificationDetailsScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    CircleAvatar(
-                                      radius: 32,
-                                      backgroundColor: _getStatusColor().withValues(alpha: 0.1),
-                                      backgroundImage: const AssetImage(
-                                        'assets/images/profile_hero.png',
-                                      ),
-                                    ),
+                                    _buildAvatar(_request!.userProfileImage, _request!.userName, size: 64),
                                     const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(

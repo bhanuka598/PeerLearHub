@@ -24,8 +24,10 @@ class VerificationRequestsScreen extends StatefulWidget {
 class _VerificationRequestsScreenState
     extends State<VerificationRequestsScreen> {
   final VerificationService _verificationService = VerificationService();
+  final TextEditingController _searchController = TextEditingController();
   
   String _selectedFilter = 'All';
+  String _searchQuery = '';
   final List<String> _filterOptions = ['All', 'Pending', 'Approved', 'Rejected'];
 
   @override
@@ -34,6 +36,79 @@ class _VerificationRequestsScreenState
     if (widget.initialFilter != null) {
       _selectedFilter = widget.initialFilter!;
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildAvatar(String? imageUrl, String userName, {double size = 60}) {
+    if (imageUrl != null && imageUrl.trim().isNotEmpty && imageUrl.startsWith('http')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackAvatar(userName, size),
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size,
+              height: size,
+              color: Colors.grey.shade100,
+              child: Center(
+                child: SizedBox(
+                  width: size * 0.4,
+                  height: size * 0.4,
+                  child: const CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    return _fallbackAvatar(userName, size);
+  }
+
+  Widget _fallbackAvatar(String userName, double size) {
+    final initial = userName.trim().isNotEmpty ? userName.trim()[0].toUpperCase() : 'U';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryTeal,
+            const Color(0xFF0284C7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryTeal.withValues(alpha: 0.25),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: size * 0.42,
+          ),
+        ),
+      ),
+    );
   }
 
   Stream<List<VerificationRequest>> _getFilteredRequests() {
@@ -123,14 +198,29 @@ class _VerificationRequestsScreenState
                         ],
                       ),
                       child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.trim().toLowerCase();
+                          });
+                        },
                         decoration: InputDecoration(
-                          hintText: 'What do you want to review?',
+                          hintText: 'Search requests by name, skill, or type...',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                           prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
@@ -232,34 +322,61 @@ class _VerificationRequestsScreenState
                     );
                   }
 
-                  final requests = snapshot.data ?? [];
+                  final allRequests = snapshot.data ?? [];
+                  final requests = _searchQuery.isEmpty
+                      ? allRequests
+                      : allRequests.where((req) {
+                          final q = _searchQuery;
+                          final name = req.userName.toLowerCase();
+                          final fullName = (req.fullName ?? '').toLowerCase();
+                          final skill = (req.skillName ?? '').toLowerCase();
+                          final type = req.verificationType.displayName.toLowerCase();
+                          return name.contains(q) || fullName.contains(q) || skill.contains(q) || type.contains(q);
+                        }).toList();
 
                   if (requests.isEmpty) {
                     return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.inbox_outlined,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No $_selectedFilter Requests',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[600],
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _searchQuery.isNotEmpty ? Icons.search_off : Icons.inbox_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'No requests matching "$_searchQuery"'
+                                  : 'No $_selectedFilter Requests',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            if (_searchQuery.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                                icon: const Icon(Icons.clear, size: 16),
+                                label: const Text('Clear search'),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     );
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     itemCount: requests.length,
                     itemBuilder: (context, index) {
                       final request = requests[index];
@@ -270,9 +387,10 @@ class _VerificationRequestsScreenState
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
+                              color: Colors.black.withValues(alpha: 0.03),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -296,22 +414,7 @@ class _VerificationRequestsScreenState
                               padding: const EdgeInsets.all(16),
                               child: Row(
                                 children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: request.userProfileImage != null
-                                        ? Image.network(
-                                            request.userProfileImage!,
-                                            width: 60,
-                                            height: 60,
-                                            fit: BoxFit.cover,
-                                          )
-                                        : Image.asset(
-                                            'assets/images/profile_hero.png',
-                                            width: 60,
-                                            height: 60,
-                                            fit: BoxFit.cover,
-                                          ),
-                                  ),
+                                  _buildAvatar(request.userProfileImage, request.userName, size: 56),
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(

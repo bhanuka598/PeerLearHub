@@ -118,6 +118,55 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     }
   }
 
+  Widget _buildUserAvatar(String? name, {double size = 44, bool isAnonymous = false}) {
+    if (isAnonymous || name == null || name.trim().isEmpty || name.toLowerCase().contains('anonymous')) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.shade100,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.blueGrey.shade300, width: 1.2),
+        ),
+        child: Icon(Icons.shield_outlined, color: Colors.blueGrey.shade700, size: size * 0.55),
+      );
+    }
+
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'U';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryTeal,
+            const Color(0xFF0D9488),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryTeal.withValues(alpha: 0.25),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: size * 0.42,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM dd, yyyy · hh:mm a');
@@ -352,16 +401,130 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                               ),
                               const SizedBox(height: 12),
                             ],
-                            _buildInfoRow(
-                              Icons.person_off_outlined,
-                              'Reported user',
-                              _report!.reportedUserName ?? 'Unknown',
+                            // Reported User Card
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildUserAvatar(_report!.reportedUserName, size: 48),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Reported User (Target)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey[600],
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _report!.reportedUserName ?? 'Unknown User',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        Text(
+                                          'ID: ${_report!.reportedUserId}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 12),
-                            _buildInfoRow(
-                              Icons.person_outlined,
-                              'Reporter',
-                              _report!.reporterName ?? 'Anonymous',
+
+                            // Reporter Card (with Whistleblower Anonymity / Privacy Support)
+                            Builder(
+                              builder: (context) {
+                                final isAnon = _report!.reporterName == null ||
+                                    _report!.reporterName!.trim().isEmpty ||
+                                    _report!.reporterName!.toLowerCase().contains('anonymous');
+                                return Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: isAnon ? const Color(0xFFF1F5F9) : AppColors.primaryTeal.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isAnon ? Colors.blueGrey.shade200 : AppColors.primaryTeal.withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      _buildUserAvatar(
+                                        _report!.reporterName,
+                                        size: 48,
+                                        isAnonymous: isAnon,
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  isAnon ? 'Confidential Reporter' : 'Reporter (Student)',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isAnon ? Colors.blueGrey.shade800 : AppColors.primaryTeal,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Icon(
+                                                  isAnon ? Icons.security : Icons.verified_user,
+                                                  size: 13,
+                                                  color: isAnon ? Colors.blueGrey.shade700 : AppColors.primaryTeal,
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              isAnon ? 'Identity Protected' : _report!.reporterName!,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                color: isAnon ? Colors.blueGrey.shade900 : Colors.black87,
+                                              ),
+                                            ),
+                                            Text(
+                                              isAnon
+                                                  ? 'Reporter details are masked for whistleblower privacy.'
+                                                  : 'Reporter ID: ${_report!.reportedBy}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[600],
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                             if (_report!.relatedContentType != null && _report!.relatedContentId != null) ...[
                               const SizedBox(height: 20),

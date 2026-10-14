@@ -20,6 +20,13 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = _authService.getCurrentUserId();
+    if (userId == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please log in')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
       body: SafeArea(
@@ -135,7 +142,7 @@ class _ModerationActionsScreenState extends State<ModerationActionsScreen> {
           // Actions List
           Expanded(
             child: StreamBuilder<List<ModerationActivity>>(
-              stream: _activityLogService.getModeratorActivities(_authService.getCurrentUserId()!),
+              stream: _activityLogService.getModeratorActivities(userId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
