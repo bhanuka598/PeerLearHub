@@ -113,8 +113,8 @@ class LessonListCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
               children: [
                 TextButton.icon(
                   onPressed: onView ??
