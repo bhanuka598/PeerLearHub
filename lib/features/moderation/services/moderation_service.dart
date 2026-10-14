@@ -1,11 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/moderation_report.dart';
+import 'activity_log_service.dart';
 
 class ModerationService {
   // Flag to use mock data (set to true when Firebase is not configured)
-  static bool useMockData = true;
+  static bool useMockData = false;
   
   final String _collection = 'reports';
+  final ActivityLogService _activityLogService = ActivityLogService();
 
   // Get all reports
   Stream<List<ModerationReport>> getReports() {
@@ -17,9 +20,7 @@ class ModerationService {
         .collection(_collection)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ModerationReport.fromFirestore(doc))
-            .toList());
+        .map((snapshot) => _parseReports(snapshot.docs));
   }
 
   // Get reports by status
@@ -33,11 +34,13 @@ class ModerationService {
     return FirebaseFirestore.instance
         .collection(_collection)
         .where('status', isEqualTo: status.name)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ModerationReport.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+          final reports = _parseReports(snapshot.docs);
+          // Sort in Dart instead of Firestore to avoid index requirement
+          reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return reports;
+        });
   }
 
   // Get reports by severity
@@ -51,11 +54,13 @@ class ModerationService {
     return FirebaseFirestore.instance
         .collection(_collection)
         .where('severity', isEqualTo: severity.name)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ModerationReport.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+          final reports = _parseReports(snapshot.docs);
+          // Sort in Dart instead of Firestore to avoid index requirement
+          reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return reports;
+        });
   }
 
   // Get report by ID
@@ -70,7 +75,7 @@ class ModerationService {
     
     final doc = await FirebaseFirestore.instance.collection(_collection).doc(id).get();
     if (doc.exists) {
-      return ModerationReport.fromFirestore(doc);
+      return _tryParseReport(doc);
     }
     return null;
   }
@@ -88,6 +93,9 @@ class ModerationService {
       return;
     }
     
+    // Get the report details before updating
+    final report = await getReportById(reportId);
+    
     final updateData = {
       'status': status.name,
       'reviewedAt': FieldValue.serverTimestamp(),
@@ -99,6 +107,96 @@ class ModerationService {
     }
     
     await FirebaseFirestore.instance.collection(_collection).doc(reportId).update(updateData);
+    
+    // Log the activity
+    if (report != null) {
+      String actionType = 'report_updated';
+      String description = 'Updated report status to ${status.displayName}';
+      
+      if (status == ReportStatus.resolved) {
+        actionType = 'report_resolved';
+        description = 'Resolved report against ${report.reportedUserName ?? report.reportedUserId}';
+      } else if (status == ReportStatus.dismissed) {
+        actionType = 'report_dismissed';
+        description = 'Dismissed report against ${report.reportedUserName ?? report.reportedUserId}';
+      }
+      
+      await _activityLogService.logAction(
+        moderatorId: moderatorId,
+        moderatorName: 'Moderator', // TODO: Get from user profile
+        actionType: actionType,
+        targetId: reportId,
+        targetUserId: report.reportedUserId,
+        description: description,
+        metadata: {
+          'reason': report.reason.name,
+          'severity': report.severity.name,
+          'resolutionNote': resolutionNote,
+        },
+      );
+    }
+  }
+
+  // Submit a new report (User action)
+  Future<void> submitReport({
+    required String reportedBy,
+    required String reportedUserId,
+    required ReportReason reason,
+    required String description,
+    required ReportSeverity severity,
+    String? reporterName,
+    String? reportedUserName,
+    String? relatedContentId,
+    String? relatedContentType,
+    String? relatedContentTitle,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return;
+    }
+    
+    String? finalReporterName = reporterName;
+    if (finalReporterName == null || finalReporterName == 'User' || finalReporterName == 'Student User') {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(reportedBy).get();
+        if (doc.exists) {
+          finalReporterName = doc.data()?['fullName'] as String? ?? doc.data()?['displayName'] as String?;
+        }
+      } catch (e) {
+        debugPrint('Error fetching reporter name: $e');
+      }
+    }
+
+    String? finalReportedUserName = reportedUserName;
+    if (finalReportedUserName == null || finalReportedUserName == 'Unknown') {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(reportedUserId).get();
+        if (doc.exists) {
+          finalReportedUserName = doc.data()?['fullName'] as String? ?? doc.data()?['displayName'] as String?;
+        }
+      } catch (e) {
+        debugPrint('Error fetching reported user name: $e');
+      }
+    }
+    
+    final docRef = FirebaseFirestore.instance.collection(_collection).doc();
+    final report = ModerationReport(
+      id: docRef.id,
+      reportedBy: reportedBy,
+      reporterName: finalReporterName,
+      reportedUserId: reportedUserId,
+      reportedUserName: finalReportedUserName,
+      relatedContentId: relatedContentId,
+      relatedContentType: relatedContentType,
+      relatedContentTitle: relatedContentTitle,
+      reason: reason,
+      description: description,
+      severity: severity,
+      status: ReportStatus.open,
+      createdAt: DateTime.now(),
+    );
+    
+    await docRef.set(report.toFirestore());
   }
 
   // Get statistics
@@ -116,18 +214,80 @@ class ModerationService {
     }
     
     final snapshot = await FirebaseFirestore.instance.collection(_collection).get();
-    final reports = snapshot.docs
-        .map((doc) => ModerationReport.fromFirestore(doc))
-        .toList();
-    
+    var open = 0;
+    var underReview = 0;
+    var resolved = 0;
+    var dismissed = 0;
+    var highSeverity = 0;
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      switch (_stringName(data['status'])) {
+        case 'open':
+          open++;
+          break;
+        case 'underReview':
+          underReview++;
+          break;
+        case 'resolved':
+          resolved++;
+          break;
+        case 'dismissed':
+          dismissed++;
+          break;
+      }
+      if (_stringName(data['severity']) == 'high') {
+        highSeverity++;
+      }
+    }
+
     return {
-      'open': reports.where((r) => r.status == ReportStatus.open).length,
-      'underReview': reports.where((r) => r.status == ReportStatus.underReview).length,
-      'resolved': reports.where((r) => r.status == ReportStatus.resolved).length,
-      'dismissed': reports.where((r) => r.status == ReportStatus.dismissed).length,
-      'highSeverity': reports.where((r) => r.severity == ReportSeverity.high).length,
-      'total': reports.length,
+      'open': open,
+      'underReview': underReview,
+      'resolved': resolved,
+      'dismissed': dismissed,
+      'highSeverity': highSeverity,
+      'total': snapshot.docs.length,
     };
+  }
+
+  // Get reports submitted by a specific user (Support Inbox)
+  Future<List<ModerationReport>> getReportsByReporter(String userId) async {
+    if (useMockData) {
+      return _getMockReports().where((r) => r.reportedBy == userId).toList();
+    }
+    final snapshot = await FirebaseFirestore.instance
+        .collection(_collection)
+        .where('reportedBy', isEqualTo: userId)
+        .get();
+        
+    final reports = _parseReports(snapshot.docs);
+    // Sort in Dart to avoid needing a Firestore composite index
+    reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return reports;
+  }
+
+  List<ModerationReport> _parseReports(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs.map(_tryParseReport).whereType<ModerationReport>().toList();
+  }
+
+  ModerationReport? _tryParseReport(DocumentSnapshot doc) {
+    try {
+      return ModerationReport.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Skipping malformed report ${doc.id}: $e');
+      return null;
+    }
+  }
+
+  String _stringName(dynamic value) {
+    if (value is String) return value;
+    if (value is List && value.isNotEmpty) {
+      return value.first.toString();
+    }
+    return value?.toString() ?? '';
   }
 
   // Mock data for development

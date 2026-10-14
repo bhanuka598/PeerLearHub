@@ -21,7 +21,7 @@ class AppColors {
   // Status Colors
   static const Color success = Color(0xFF16A34A);
   static const Color pending = Color(0xFFF59E0B);
-  static const Color error = Color(0xDC2626);
+  static const Color error = Color(0xFFDC2626);
   
   // Status Semantic Colors
   static const Color approved = success;

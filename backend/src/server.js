@@ -18,7 +18,7 @@ const otpStore = new Map();
 
 // Configure CORS to allow requests from Flutter web
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'],
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -471,6 +471,330 @@ app.post('/api/assignments/submit', async (req, res) => {
   }
 });
 
+// AI Skill Exchange Match Suggestions endpoint (uses GEMINI_API_KEY from .env)
+app.post('/api/ai/match-suggestions', async (req, res) => {
+  try {
+    const { prompt } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'GEMINI_API_KEY is not configured in backend .env',
+      });
+    }
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing prompt in request body.',
+      });
+    }
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 500,
+        },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini API returned error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({
+        success: false,
+        message: 'Gemini API call failed',
+      });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsedList = [];
+    try {
+      parsedList = JSON.parse(cleanJson);
+    } catch (parseErr) {
+      console.warn('Could not parse Gemini JSON response:', cleanJson);
+    }
+
+    return res.json({
+      success: true,
+      suggestions: parsedList,
+    });
+  } catch (error) {
+    console.error('Failed to generate AI match suggestions:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'AI suggestion generation failed.',
+    });
+  }
+});
+
+// AI Personalized Course Feed endpoint
+app.post('/api/ai/recommendations', async (req, res) => {
+  try {
+    const { profile, courses } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY missing' });
+    }
+    if (!Array.isArray(courses) || courses.length === 0) {
+      return res.json({ success: true, feed: [] });
+    }
+
+    const prompt = `
+You are an AI Learning Advisor for PeerLearn Hub. Build a personalized course feed
+for the learner below that precisely matches their learning goal, current skill level,
+interests, and recent search queries.
+
+LEARNER PROFILE:
+${JSON.stringify(profile, null, 2)}
+
+AVAILABLE COURSES:
+${JSON.stringify(courses, null, 2)}
+
+Rules:
+- Recommend at most 6 unique courses total.
+- Match candidate courses against:
+  1) Learner's goal (career/skill ambition)
+  2) Learner's skill level (Beginner / Intermediate / Advanced)
+  3) Learner's selected interests & topic tags
+  4) Learner's past searches / search history
+- Each recommendation MUST have a distinct "section" from:
+  "goal", "skill_level", "interests", "past_search", "continue", "trending".
+- "goal" = directly aligns with the learner's stated goal or career path.
+- "skill_level" = ideally pitched at their current skill level tier.
+- "interests" = matches their explicit topic interests.
+- "past_search" = matches topics they recently searched for.
+- "continue" = courses currently enrolled in with pending progress.
+- "trending" = popular peer learning courses.
+- Skip courses the learner has already completed (progress == 100).
+- Give each a matchScore (integer 60-99) and a concise 1-sentence personalized reasoning explaining why it matches their goal, level, interests, or past searches.
+
+Return ONLY a raw JSON object with this exact shape (no markdown fences):
+{
+  "feed": [
+    {
+      "courseId": "string",
+      "section": "goal",
+      "matchScore": 92,
+      "reasoning": "1-sentence personal reason."
+    }
+  ]
+}
+`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini feed error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed = { feed: [] };
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('Failed to parse feed JSON:', cleanJson);
+    }
+
+    return res.json({ success: true, feed: parsed.feed ?? [] });
+  } catch (error) {
+    console.error('AI feed error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// AI Similar Courses endpoint ("Students who viewed this also viewed...")
+app.post('/api/ai/similar-courses', async (req, res) => {
+  try {
+    const { currentCourse, courses, coEnrolledCourseIds, coViewedCourseIds } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY missing' });
+    }
+    if (!currentCourse || !Array.isArray(courses) || courses.length === 0) {
+      return res.json({ success: true, similarCourses: [] });
+    }
+
+    const prompt = `
+You are an expert Education Recommender AI for PeerLearn Hub.
+A student is currently viewing the following course:
+CURRENT COURSE:
+${JSON.stringify(currentCourse, null, 2)}
+
+ADDITIONAL BEHAVIORAL SIGNALS:
+- Co-Enrolled Course IDs: ${JSON.stringify(coEnrolledCourseIds || [])}
+- Frequently Co-Viewed Course IDs: ${JSON.stringify(coViewedCourseIds || [])}
+
+AVAILABLE CANDIDATE COURSES:
+${JSON.stringify(courses, null, 2)}
+
+TASK:
+Provide up to 4 similar courses under the theme "Students who viewed this also viewed...".
+Consider:
+1. Shared concepts, tags, and curriculum progression.
+2. Behavioral co-views and co-enrollments.
+3. Natural next steps or complementary skills.
+
+Return ONLY a raw JSON object with this exact schema (no markdown formatting or fences):
+{
+  "similarCourses": [
+    {
+      "courseId": "string",
+      "similarityScore": 92,
+      "reasoning": "Concise 1-sentence reason why students viewing the current course also explore this."
+    }
+  ]
+}
+`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini similar courses error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed = { similarCourses: [] };
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('Failed to parse similar courses JSON:', cleanJson);
+    }
+
+    return res.json({ success: true, similarCourses: parsed.similarCourses ?? [] });
+  } catch (error) {
+    console.error('Similar courses error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// AI Skill-gap recommendations endpoint
+app.post('/api/ai/skill-gap', async (req, res) => {
+  try {
+    const { targetRole, currentSkills, completedCourses, candidateCourses } = req.body ?? {};
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY missing' });
+    }
+    if (!targetRole || !Array.isArray(candidateCourses) || candidateCourses.length === 0) {
+      return res.json({ success: true, data: null });
+    }
+
+    const prompt = `
+You are an expert Career Advisor and Tech Skill-Gap Analyzer for PeerLearn Hub.
+Analyze the student's background against their Target Role to identify mastered vs missing skills, compute a career readiness score (0-100%), and recommend matching courses to bridge the gap.
+
+TARGET JOB ROLE: "${targetRole}"
+STUDENT'S CURRENT SKILLS: ${JSON.stringify(currentSkills || [])}
+COMPLETED COURSES: ${JSON.stringify(completedCourses || [])}
+AVAILABLE COURSES TO BRIDGE GAPS:
+${JSON.stringify(candidateCourses, null, 2)}
+
+Instructions:
+1. Identify 5-7 key skills required in industry for the target job role "${targetRole}".
+2. Classify them into "masteredSkills" (what the student already has from current skills or completed courses) and "missingSkills" (the skill gap).
+3. Compute a "readinessScore" percentage (integer 0-100).
+4. Select up to 4 best courses that teach the missing skills.
+5. For each recommended course provide:
+   - "courseId": exact ID
+   - "coveredSkills": list of missing skills covered
+   - "matchScore": integer 70-98
+   - "reasoning": 1 sentence explaining how it bridges their specific skill gap for the role.
+
+Return ONLY a raw JSON object with this exact format (no markdown formatting or backticks):
+{
+  "targetRole": "${targetRole}",
+  "readinessScore": 65,
+  "masteredSkills": ["Skill A", "Skill B"],
+  "missingSkills": ["Skill C", "Skill D", "Skill E"],
+  "recommendedCourses": [
+    {
+      "courseId": "string",
+      "coveredSkills": ["Skill C"],
+      "matchScore": 92,
+      "reasoning": "Closes your gap in Skill C needed for ${targetRole}."
+    }
+  ]
+}
+`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('Gemini skill-gap error:', geminiResponse.status, errText);
+      return res.status(geminiResponse.status).json({ success: false, message: 'Gemini API failed' });
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('Failed to parse skill-gap JSON:', cleanJson);
+    }
+
+    return res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Skill-gap route error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -478,7 +802,7 @@ app.use((req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`PeerLearnHub backend listening on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`PeerLearnHub backend listening on http://0.0.0.0:${port} (and http://10.0.2.2:${port} for Android emulator)`);
   console.log(`Environment: ${process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 });

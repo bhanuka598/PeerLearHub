@@ -6,6 +6,11 @@ service cloud.firestore {
       allow read, create, update: if request.auth != null
         && request.auth.uid == userId;
 
+      match /profile/{docId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
       match /enrollments/{courseId} {
         allow read, create, update: if request.auth != null
           && request.auth.uid == userId;
@@ -15,6 +20,93 @@ service cloud.firestore {
         allow read, create, update: if request.auth != null
           && request.auth.uid == userId;
       }
+
+      match /quizSubmissions/{submissionId} {
+        allow read, create, update: if request.auth != null
+          && request.auth.uid == userId;
+        allow delete: if false;
+      }
+
+      match /assignmentSubmissions/{submissionId} {
+        allow read, create, update: if request.auth != null
+          && request.auth.uid == userId;
+        allow delete: if false;
+      }
+    }
+
+    match /lessons/{lessonId} {
+      allow read, write: if request.auth != null;
+
+      match /modules/{moduleId}/quizzes/{quizDoc} {
+        allow read: if request.auth != null
+          && (resource.data.status == 'published'
+              || get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid
+              || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator');
+        allow create, update: if request.auth != null
+          && get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid;
+        allow update: if request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+        match /versions/{versionId} {
+          allow read: if request.auth != null;
+          allow write: if request.auth != null
+            && get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid;
+        }
+      }
+
+      match /modules/{moduleId}/assignment/{assignmentDoc} {
+        allow read: if request.auth != null
+          && (resource.data.status == 'published'
+              || get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid
+              || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator');
+        allow create, update: if request.auth != null
+          && get(/databases/$(database)/documents/lessons/$(lessonId)).data.providerId == request.auth.uid;
+        allow update: if request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      }
+    }
+
+    match /reviews/{reviewId} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && request.auth.uid == resource.data.learnerId;
+    }
+
+    match /teacherProfiles/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /sessions/{sessionId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Helper function to check if user is moderator
+    function isModerator() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
+    }
+
+    match /reports/{reportId} {
+      allow read: if request.auth != null && (isModerator() || resource.data.reportedBy == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update, delete: if isModerator();
+    }
+
+    match /verificationRequests/{requestId} {
+      allow read: if request.auth != null && (isModerator() || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update, delete: if isModerator();
+    }
+
+    match /moderationLogs/{logId} {
+      allow read, write: if isModerator();
     }
   }
 }

@@ -12,9 +12,57 @@ class AppAuth extends ChangeNotifier {
 
   AppUserRole? get currentRole => _currentRole;
 
+  static const _skillProviderRoutes = [
+    '/skill-provider',
+    '/skill-provider/my-lessons',
+    '/skill-provider/create',
+    '/skill-provider/edit',
+    '/skill-provider/lesson',
+    '/skill-provider/bookings',
+    '/skill-provider/booking',
+    '/skill-provider/reschedule',
+    '/skill-provider/messages',
+    '/skill-provider/sessions',
+    '/skill-provider/session',
+    '/skill-provider/reviews',
+    '/skill-provider/profile',
+    '/notifications',
+    '/learning/sessions',
+    '/learning/session-feedback',
+  ];
+
   void setRole(AppUserRole role) {
     _currentRole = role;
     notifyListeners();
+  }
+
+  void setRoleFromApi(String? roleString) {
+    switch (roleString) {
+      case 'moderator':
+        setRole(AppUserRole.moderator);
+        break;
+      case 'teacher':
+        setRole(AppUserRole.teacher);
+        break;
+      case 'admin':
+        setRole(AppUserRole.admin);
+        break;
+      default:
+        setRole(AppUserRole.student);
+    }
+  }
+
+  String getHomeRouteForRole(String? roleString) {
+    switch (roleString) {
+      case 'moderator':
+        return '/moderation';
+      case 'teacher':
+        return '/skill-provider';
+      case 'admin':
+        return '/moderation';
+      default:
+        return '/learning';
+    }
   }
 
   void switchRole(AppUserRole role) {
@@ -25,27 +73,14 @@ class AppAuth extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      // Fetch user role from backend
+      // Prefer the backend role when available, but fall back to the saved Firestore role.
       try {
         final loginData = await AuthService.instance.loginWithRole();
         final roleString = loginData['user']['role'] as String?;
-        
-        switch (roleString) {
-          case 'moderator':
-            setRole(AppUserRole.moderator);
-            break;
-          case 'teacher':
-            setRole(AppUserRole.teacher);
-            break;
-          case 'admin':
-            setRole(AppUserRole.admin);
-            break;
-          default:
-            setRole(AppUserRole.student);
-        }
+        setRoleFromApi(roleString);
       } catch (e) {
-        debugPrint('Failed to fetch user role: $e');
-        setRole(AppUserRole.student);
+        debugPrint('Failed to fetch user role from backend: $e');
+        setRoleFromApi(await AuthService.instance.getCurrentUserRole());
       }
     }
     return signedIn;
@@ -54,17 +89,11 @@ class AppAuth extends ChangeNotifier {
   Future<bool> registerAsModerator() async {
     try {
       final userData = await AuthService.instance.registerAsModerator();
-      
+
       // Update role based on response
       final roleString = userData['role'] as String?;
-      switch (roleString) {
-        case 'moderator':
-          setRole(AppUserRole.moderator);
-          break;
-        default:
-          setRole(AppUserRole.student);
-      }
-      
+      setRoleFromApi(roleString);
+
       return true;
     } catch (e) {
       debugPrint('Failed to register as moderator: $e');
@@ -93,11 +122,26 @@ class AppAuth extends ChangeNotifier {
     }
   }
 
+  static bool _isParameterizedSkillProviderRoute(String location) {
+    return location.startsWith('/skill-provider/lesson/') &&
+        (location.endsWith('/manage') ||
+            location.contains('/module/') &&
+                (location.endsWith('/quiz') ||
+                    location.endsWith('/assignment')));
+  }
+
+  static bool _isParameterizedLearningAssessmentRoute(String location) {
+    return location.startsWith('/learning/lesson/') &&
+        location.contains('/module/') &&
+        (location.endsWith('/quiz') || location.endsWith('/assignment'));
+  }
+
   bool canAccess(String location) {
     final cleanLocation = location.split('?').first;
-    final allowedForGuest = [
+    const allowedForGuest = [
       '/',
       '/loading',
+      '/welcome',
       '/login',
       '/register',
       '/moderation/register',
@@ -110,17 +154,6 @@ class AppAuth extends ChangeNotifier {
 
     switch (_currentRole) {
       case AppUserRole.student:
-        return cleanLocation == '/learning' ||
-            cleanLocation == '/learning/my-courses' ||
-            cleanLocation == '/learning/course' ||
-            cleanLocation == '/learning/lesson' ||
-            cleanLocation == '/learning/quiz' ||
-            cleanLocation == '/learning/assignment' ||
-            cleanLocation == '/skill-exchange' ||
-            cleanLocation == '/skill-provider' ||
-            cleanLocation == '/skill-provider/my-lessons' ||
-            cleanLocation == '/skill-provider/create' ||
-            cleanLocation == '/skill-provider/edit';
       case AppUserRole.teacher:
         return cleanLocation == '/learning' ||
             cleanLocation == '/learning/my-courses' ||
@@ -128,15 +161,22 @@ class AppAuth extends ChangeNotifier {
             cleanLocation == '/learning/lesson' ||
             cleanLocation == '/learning/quiz' ||
             cleanLocation == '/learning/assignment' ||
+            cleanLocation == '/learning/provider-lesson' ||
+            cleanLocation == '/profile' ||
             cleanLocation == '/skill-exchange' ||
-            cleanLocation == '/skill-provider' ||
-            cleanLocation == '/skill-provider/my-lessons' ||
-            cleanLocation == '/skill-provider/create' ||
-            cleanLocation == '/skill-provider/edit';
+            _skillProviderRoutes.contains(cleanLocation) ||
+            _isParameterizedSkillProviderRoute(cleanLocation) ||
+            _isParameterizedLearningAssessmentRoute(cleanLocation);
       case AppUserRole.moderator:
-        return cleanLocation == '/moderation';
+        return cleanLocation == '/moderation' ||
+            cleanLocation == '/learning/course' ||
+            cleanLocation == '/learning/provider-lesson' ||
+            cleanLocation == '/profile';
       case AppUserRole.admin:
-        return cleanLocation == '/moderation';
+        return cleanLocation == '/moderation' ||
+            cleanLocation == '/learning/course' ||
+            cleanLocation == '/learning/provider-lesson' ||
+            cleanLocation == '/profile';
       case null:
         return false;
     }

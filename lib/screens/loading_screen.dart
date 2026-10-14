@@ -2,216 +2,198 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/widgets/app_logo.dart';
+import '../core/widgets/auth/auth_ui.dart';
 
 class LoadingScreen extends StatelessWidget {
   const LoadingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 900;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        if (isWide) {
+          return Scaffold(
+            body: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppTheme.iconBackground,
-                        borderRadius: BorderRadius.circular(14),
+                const Expanded(child: AuthBrandPanel(showHighlights: true)),
+                Expanded(
+                  child: AuthPageBackground(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 32,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 460),
+                          child: const _WelcomeContent(compact: false),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'PeerLearnHub',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                Center(
-                  child: Container(
-                    width: 180,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: AppTheme.iconBackground,
-                      borderRadius: BorderRadius.circular(32),
-                    ),
-                    child: const Icon(
-                      Icons.menu_book_rounded,
-                      size: 92,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Center(
-                  child: Text(
-                    'Learn. Share. Grow.',
-                    textAlign: TextAlign.center,
-                    style: textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    'Discover new skills, learn from others, and share what you know.',
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                _FeatureCard(
-                  title: 'Discover Skills',
-                  subtitle: 'Find courses and learning content.',
-                  icon: Icons.explore_outlined,
-                ),
-                const SizedBox(height: 12),
-                _FeatureCard(
-                  title: 'Learn & Progress',
-                  subtitle: 'Build skills through structured learning.',
-                  icon: Icons.track_changes_rounded,
-                ),
-                const SizedBox(height: 12),
-                _FeatureCard(
-                  title: 'Share Knowledge',
-                  subtitle: 'Connect and share skills with others.',
-                  icon: Icons.people_alt_outlined,
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => context.go('/register'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Get Started',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => context.go('/login'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primaryColor,
-                      side: const BorderSide(color: AppTheme.primaryColor),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'I already have an account',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Center(
-                  child: Text(
-                    'Learn skills. Connect with people. Grow together.',
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
               ],
             ),
+          );
+        }
+
+        return Scaffold(
+          body: AuthPageBackground(
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: const _WelcomeContent(compact: true),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
+class _WelcomeContent extends StatelessWidget {
+  const _WelcomeContent({required this.compact});
 
-  final String title;
-  final String subtitle;
-  final IconData icon;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (compact) ...[
+          Row(
+            children: [
+              const AppLogo(size: 40, borderRadius: 14),
+              const SizedBox(width: 12),
+              Text(
+                'PeerLearnHub',
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+        ],
+        Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: compact ? 190 : 210,
+                height: compact ? 190 : 210,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.primaryLight.withValues(alpha: 0.28),
+                      AppTheme.primaryLight.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+              AppLogo(size: compact ? 148 : 168, borderRadius: 36),
+            ],
+          ),
+        ),
+        SizedBox(height: compact ? 24 : 28),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: AppTheme.iconBackground,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: AppTheme.primaryLight.withValues(alpha: 0.35),
+              ),
             ),
-            child: Icon(icon, color: AppTheme.primaryColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
+            child: Text(
+              'Your peer learning community',
+              style: textTheme.labelLarge?.copyWith(
+                color: AppTheme.primaryDark,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            'Learn. Share. Grow.',
+            textAlign: TextAlign.center,
+            style: textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Center(
+          child: Text(
+            'Discover new skills, learn from others, and share what you know.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyLarge?.copyWith(
+              color: AppTheme.textSecondary,
+              height: 1.55,
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
+        const AuthFeatureTile(
+          title: 'Discover Skills',
+          subtitle: 'Find courses and learning content that match your goals.',
+          icon: Icons.explore_outlined,
+        ),
+        const SizedBox(height: 12),
+        const AuthFeatureTile(
+          title: 'Learn & Progress',
+          subtitle: 'Build skills through structured lessons and milestones.',
+          icon: Icons.track_changes_rounded,
+        ),
+        const SizedBox(height: 12),
+        const AuthFeatureTile(
+          title: 'Share Knowledge',
+          subtitle: 'Connect with peers and teach what you already know.',
+          icon: Icons.people_alt_outlined,
+        ),
+        const SizedBox(height: 28),
+        AuthPrimaryButton(
+          label: 'Get Started',
+          icon: Icons.arrow_forward_rounded,
+          onPressed: () => context.go('/register'),
+        ),
+        const SizedBox(height: 12),
+        AuthSecondaryButton(
+          label: 'I already have an account',
+          onPressed: () => context.go('/login'),
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: Text(
+            'Learn skills. Connect with people. Grow together.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
