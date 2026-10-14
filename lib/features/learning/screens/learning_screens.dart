@@ -243,13 +243,57 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     const availableInterests = [
       'Mobile Development',
       'Flutter',
+      'React Native',
       'Python',
+      'Go',
+      'Rust',
+      'C# & .NET',
+      'Dart',
+      'Java',
       'UI/UX Design',
+      'Figma',
       'Web Development',
+      'HTML & CSS',
+      'Tailwind CSS',
+      'JavaScript',
+      'React',
+      'Node.js',
+      'FastAPI',
+      'Spring Boot',
+      'Database Management',
+      'SQL & NoSQL',
+      'PostgreSQL',
+      'MongoDB',
+      'Oracle Database',
+      'API Design & Development',
+      'RESTful APIs',
+      'GraphQL',
+      'Machine Learning',
       'Cloud & DevOps',
+      'Linux & Docker',
+      'Kubernetes',
+      'Containerization',
+      'CI/CD Pipelines',
+      'Git & GitHub',
+      'AWS & Azure',
       'Cyber Security',
       'Artificial Intelligence',
+      'Blockchain',
+      'Game Development',
       'Data Science',
+      'Big Data',
+      'Project Management',
+      'Agile & Scrum',
+      'System Architecture',
+      'Microservices Architecture',
+      'MicroKernel Architecture',
+      'Event-Driven Architecture',
+      'Soft Skills',
+      'Communication Skills',
+      'English Proficiency',
+      'Leadership & Teamwork',
+      'Problem Solving',
+      'Critical Thinking',
     ];
 
     showDialog(
@@ -283,7 +327,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   const Text('Your Current Skill Level', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: ['Beginner', 'Intermediate', 'Advanced'].contains(selectedLevel) ? selectedLevel : 'Beginner',
+                    initialValue: ['Beginner', 'Intermediate', 'Advanced'].contains(selectedLevel) ? selectedLevel : 'Beginner',
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1500,7 +1544,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<ReportReason>(
-                    value: reason,
+                    initialValue: reason,
                     decoration: const InputDecoration(labelText: 'Reason'),
                     items: ReportReason.values.map((r) => DropdownMenuItem(
                       value: r,
@@ -2196,24 +2240,31 @@ class _QuizScreenState extends State<QuizScreen> {
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          for (var i = 0; i < _question.options.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: RadioListTile<int>(
-                value: i,
-                groupValue: _selectedIndex,
-                onChanged: _checking
-                    ? null
-                    : (value) => setState(() => _selectedIndex = value),
-                title: Text(_question.options[i]),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                tileColor: _selectedIndex == i
-                    ? AppTheme.primaryColor.withValues(alpha: 0.1)
-                    : null,
-              ),
+          RadioGroup<int>(
+            groupValue: _selectedIndex,
+            onChanged: (value) {
+              if (_checking) return;             // early exit instead of null
+              setState(() => _selectedIndex = value);
+            },
+            child: Column(
+              children: [
+                for (var i = 0; i < _question.options.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: RadioListTile<int>(
+                      value: i,
+                      title: Text(_question.options[i]),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor: _selectedIndex == i
+                          ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                          : null,
+                    ),
+                  ),
+              ],
             ),
+          ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed:
