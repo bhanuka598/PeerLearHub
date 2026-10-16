@@ -15,15 +15,22 @@ class EmptyLessonsState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                gradient: AppTheme.teacherHeaderGradient,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.28),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.menu_book_outlined,
                 size: 48,
-                color: AppTheme.primaryColor,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 24),

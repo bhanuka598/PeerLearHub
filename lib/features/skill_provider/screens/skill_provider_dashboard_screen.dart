@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,7 +8,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../models/lesson.dart';
 import '../../../models/provider_dashboard_stats.dart';
 import '../models/teacher_profile.dart';
+import '../services/booking_service.dart';
 import '../services/firebase_lesson_service.dart';
+import '../services/message_service.dart';
+import '../services/session_service.dart';
 import '../services/teacher_profile_service.dart';
 import '../utils/provider_id_helper.dart';
 import '../widgets/app_header.dart';
@@ -68,6 +73,9 @@ class _SkillProviderDashboardScreenState
           _isLoading = false;
         });
       }
+      unawaited(BookingService.instance.getBookingsByProvider(providerId));
+      unawaited(SessionService.instance.getSessionsByProvider(providerId));
+      unawaited(MessageService.instance.getThreads(providerId));
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -78,7 +86,7 @@ class _SkillProviderDashboardScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/skill-provider/create'),
         backgroundColor: AppTheme.primaryColor,
@@ -111,7 +119,7 @@ class _SkillProviderDashboardScreenState
                     onRefresh: _loadStats,
                     onLogout: () {
                       AppAuth.instance.logout();
-                      context.go('/');
+                      context.go('/login');
                     },
                   );
                 },
@@ -165,7 +173,7 @@ class _SkillProviderDashboardScreenState
                 title: 'Total lessons',
                 value: '${stats.totalLessons}',
                 icon: Icons.menu_book_outlined,
-                color: AppTheme.primaryColor,
+                color: const Color(0xFF0F766E),
               ),
             ),
             const SizedBox(width: 12),
@@ -174,7 +182,7 @@ class _SkillProviderDashboardScreenState
                 title: 'Active',
                 value: '${stats.activeLessons}',
                 icon: Icons.check_circle_outline,
-                color: const Color(0xFF2E7D32),
+                color: const Color(0xFF059669),
               ),
             ),
           ],
@@ -187,7 +195,7 @@ class _SkillProviderDashboardScreenState
                 title: 'Pending',
                 value: '${stats.pendingRequests}',
                 icon: Icons.hourglass_empty,
-                color: const Color(0xFFEF6C00),
+                color: const Color(0xFFEA580C),
               ),
             ),
             const SizedBox(width: 12),
@@ -196,7 +204,7 @@ class _SkillProviderDashboardScreenState
                 title: 'Completed',
                 value: '${stats.completedLessons}',
                 icon: Icons.task_alt_outlined,
-                color: const Color(0xFF2E7D32),
+                color: const Color(0xFF4F46E5),
               ),
             ),
           ],
@@ -306,7 +314,7 @@ class _SkillProviderDashboardScreenState
         const SizedBox(height: 12),
         if (lessons.isEmpty)
           Container(
-            decoration: AppTheme.cardDecoration,
+            decoration: AppTheme.teacherCardDecoration,
             padding: const EdgeInsets.all(24),
             child: Center(
               child: Text(

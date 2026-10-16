@@ -21,7 +21,7 @@ class RecentLessonTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => context.push('/skill-provider/lesson', extra: lesson),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/moderation_report.dart';
 import '../services/moderation_service.dart';
@@ -92,7 +93,7 @@ class _SupportInboxScreenState extends State<SupportInboxScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => popOrGo(context, '/moderation'),
           ),
           const SizedBox(width: 8),
           const Text(

@@ -112,7 +112,7 @@ class _CourseManageScreenState extends State<CourseManageScreen> {
     final lesson = _lesson;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: TealPageHeader(
         title: lesson?.title ?? 'Manage Assessments',
       ),
@@ -142,7 +142,7 @@ class _CourseManageScreenState extends State<CourseManageScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: Container(
-                            decoration: AppTheme.cardDecoration,
+                            decoration: AppTheme.teacherCardDecoration,
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,6 +161,7 @@ class _CourseManageScreenState extends State<CourseManageScreen> {
                                 _AssessmentCard(
                                   icon: Icons.quiz_outlined,
                                   label: 'Quiz',
+                                  accent: AppTheme.teacherAccentIndigo,
                                   status: _statusLabel(quiz?.status),
                                   statusColor: _statusColor(quiz?.status),
                                   buttonLabel: quiz == null ? 'Create' : 'Edit',
@@ -172,6 +173,7 @@ class _CourseManageScreenState extends State<CourseManageScreen> {
                                 _AssessmentCard(
                                   icon: Icons.assignment_outlined,
                                   label: 'Assignment',
+                                  accent: AppTheme.teacherAccentEmerald,
                                   status: _statusLabel(assignment?.status),
                                   statusColor:
                                       _statusColor(assignment?.status),
@@ -197,6 +199,7 @@ class _AssessmentCard extends StatelessWidget {
   const _AssessmentCard({
     required this.icon,
     required this.label,
+    required this.accent,
     required this.status,
     required this.statusColor,
     required this.buttonLabel,
@@ -205,6 +208,7 @@ class _AssessmentCard extends StatelessWidget {
 
   final IconData icon;
   final String label;
+  final Color accent;
   final String status;
   final Color statusColor;
   final String buttonLabel;
@@ -215,12 +219,13 @@ class _AssessmentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.iconBackground,
-        borderRadius: BorderRadius.circular(12),
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.primaryColor, size: 28),
+          Icon(icon, color: accent, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -245,7 +250,7 @@ class _AssessmentCard extends StatelessWidget {
           FilledButton(
             onPressed: onPressed,
             style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: accent,
             ),
             child: Text(buttonLabel),
           ),

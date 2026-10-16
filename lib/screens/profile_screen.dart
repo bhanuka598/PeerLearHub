@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:peer_learn_hub/core/auth/auth_service.dart';
+import 'package:go_router/go_router.dart';
+import 'package:peer_learn_hub/core/auth/app_auth.dart';
+import 'package:peer_learn_hub/core/router/app_navigation.dart';
 import 'package:peer_learn_hub/core/widgets/role_switcher_button.dart';
 import 'package:peer_learn_hub/features/moderation/models/verification_request.dart';
 import 'package:peer_learn_hub/features/moderation/services/verification_service.dart';
@@ -95,9 +97,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _signOut() async {
-    await AuthService.instance.signOut();
+    AppAuth.instance.logout();
     if (mounted) {
-      // Navigation will be handled by the router's auth state
+      context.go('/login');
     }
   }
 
@@ -349,6 +351,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => popOrGo(context, AppAuth.instance.getHomeRoute()),
+        ),
         title: const Text('Profile'),
         actions: [
           const RoleSwitcherButton(),

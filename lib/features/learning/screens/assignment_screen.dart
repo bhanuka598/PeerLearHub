@@ -4,6 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/role_switcher_button.dart';
 import '../models/learning_course.dart';
@@ -109,6 +110,10 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Final Assignment'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => popOrGo(context, '/learning/my-courses'),
+        ),
         actions: const [RoleSwitcherButton()],
       ),
       body: ListView(

@@ -16,7 +16,7 @@ class LessonDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(title: 'Lesson Details'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -176,7 +176,7 @@ class LessonDetailsScreen extends StatelessWidget {
 
   Widget _buildHeroCard(BuildContext context) {
     return Container(
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -292,7 +292,7 @@ class LessonDetailsScreen extends StatelessWidget {
     required Widget child,
   }) {
     return Container(
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -303,8 +303,8 @@ class LessonDetailsScreen extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.iconBackground,
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: AppTheme.primaryColor, size: 20),
               ),

@@ -19,7 +19,7 @@ class QuickActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,

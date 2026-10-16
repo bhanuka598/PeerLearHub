@@ -45,12 +45,12 @@ class _RescheduleSessionScreenState extends State<RescheduleSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(title: 'Reschedule Session'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Container(
-          decoration: AppTheme.cardDecoration,
+          decoration: AppTheme.teacherCardDecoration,
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

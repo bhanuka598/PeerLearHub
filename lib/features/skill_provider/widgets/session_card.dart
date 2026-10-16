@@ -17,10 +17,10 @@ class SessionCard extends StatelessWidget {
         hasSessionEnded(session);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       child: InkWell(
         onTap: () => context.push('/skill-provider/session', extra: session),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -28,10 +28,10 @@ class SessionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.iconBackground,
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.teacherAccentIndigo.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.event, color: AppTheme.primaryColor),
+                child: const Icon(Icons.event, color: AppTheme.teacherAccentIndigo),
               ),
               const SizedBox(width: 12),
               Expanded(

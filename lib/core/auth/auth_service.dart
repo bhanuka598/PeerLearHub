@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,14 +8,22 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
+class ResolvedLoginSession {
+  const ResolvedLoginSession({required this.role, this.redirectRoute});
+
+  final String? role;
+  final String? redirectRoute;
+}
+
 class AuthService {
   AuthService._();
 
   static final AuthService instance = AuthService._();
 
-  static const String _defaultBackendUrl = String.fromEnvironment(
+  /// Set with `--dart-define=BACKEND_URL=http://host:4000` for a physical
+  /// device APK. Empty keeps the platform defaults below.
+  static const String _configuredBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://localhost:4000',
   );
   static const String _googleServerClientId =
       '536687852853-hfodgc9f3a88chmuskg16qrck22spp4v.apps.googleusercontent.com';
@@ -25,6 +34,63 @@ class AuthService {
   String? _lastError;
 
   String? get lastError => _lastError;
+
+  static const Duration _backendTimeout = Duration(seconds: 4);
+
+  Future<http.Response> _postBackend(
+    String path, {
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      return await http
+          .post(
+            Uri.parse('$backendBaseUrl$path'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(_backendTimeout);
+    } on TimeoutException {
+      throw Exception('Network error. Check your connection and try again.');
+    }
+  }
+
+  void _saveUserProfile({
+    required String uid,
+    required Map<String, dynamic> data,
+    bool merge = false,
+    required String permissionDeniedMessage,
+  }) {
+    unawaited(
+      _writeUserProfile(
+        uid: uid,
+        data: data,
+        merge: merge,
+        permissionDeniedMessage: permissionDeniedMessage,
+      ),
+    );
+  }
+
+  Future<void> _writeUserProfile({
+    required String uid,
+    required Map<String, dynamic> data,
+    required bool merge,
+    required String permissionDeniedMessage,
+  }) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set(data, merge ? SetOptions(merge: true) : null);
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') {
+        debugPrint(permissionDeniedMessage);
+        return;
+      }
+      debugPrint('User profile was not saved: $error');
+    } catch (error) {
+      debugPrint('User profile was not saved: $error');
+    }
+  }
 
   FirebaseAuth get _requiredFirebaseAuth {
     final firebaseAuth = _firebaseAuth;
@@ -46,8 +112,15 @@ class AuthService {
   }
 
   static String get backendBaseUrl {
+    final configured = _configuredBackendUrl.trim();
+    if (configured.isNotEmpty) {
+      return configured.endsWith('/')
+          ? configured.substring(0, configured.length - 1)
+          : configured;
+    }
+
     if (kIsWeb) {
-      return _defaultBackendUrl;
+      return 'http://localhost:4000';
     }
 
     if (Platform.isAndroid) {
@@ -58,7 +131,7 @@ class AuthService {
       return 'http://127.0.0.1:4000';
     }
 
-    return _defaultBackendUrl;
+    return 'http://localhost:4000';
   }
 
   Future<UserCredential> registerWithEmail({
@@ -80,8 +153,11 @@ class AuthService {
     }
 
     await user.updateDisplayName(fullName.trim());
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+    _saveUserProfile(
+      uid: user.uid,
+      permissionDeniedMessage:
+          'User profile was not saved: Firestore permissions denied.',
+      data: {
         'uid': user.uid,
         'fullName': fullName.trim(),
         'email': user.email,
@@ -89,13 +165,8 @@ class AuthService {
         'role': role,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } on FirebaseException catch (error) {
-      if (error.code != 'permission-denied') {
-        rethrow;
-      }
-      debugPrint('User profile was not saved: Firestore permissions denied.');
-    }
+      },
+    );
     return credential;
   }
 
@@ -110,22 +181,19 @@ class AuthService {
     );
     final user = credential.user;
     if (user != null) {
-      try {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      _saveUserProfile(
+        uid: user.uid,
+        merge: true,
+        permissionDeniedMessage:
+            'Login succeeded, but the profile timestamp was not saved: '
+            'Firestore permissions denied.',
+        data: {
           'uid': user.uid,
           'email': user.email,
           'lastLoginAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } on FirebaseException catch (error) {
-        if (error.code != 'permission-denied') {
-          rethrow;
-        }
-        debugPrint(
-          'Login succeeded, but the profile timestamp was not saved: '
-          'Firestore permissions denied.',
-        );
-      }
+        },
+      );
     }
     return credential;
   }
@@ -135,11 +203,26 @@ class AuthService {
     await _googleSignIn.signOut();
   }
 
+  /// Waits for Firebase to restore a saved session, if one exists.
+  Future<User?> currentUserOrNull() async {
+    final auth = _firebaseAuth;
+    if (auth == null) {
+      return null;
+    }
+
+    try {
+      return await auth.authStateChanges().first.timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (_) {
+      return auth.currentUser;
+    }
+  }
+
   Future<void> requestPasswordResetCode(String email) async {
-    final response = await http.post(
-      Uri.parse('$backendBaseUrl/api/auth/password-reset/request'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    final response = await _postBackend(
+      '/api/auth/password-reset/request',
+      body: {'email': email.trim().toLowerCase()},
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode != 200 || payload['success'] != true) {
@@ -154,14 +237,13 @@ class AuthService {
     required String otp,
     required String newPassword,
   }) async {
-    final response = await http.post(
-      Uri.parse('$backendBaseUrl/api/auth/password-reset/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
+    final response = await _postBackend(
+      '/api/auth/password-reset/verify',
+      body: {
         'email': email.trim().toLowerCase(),
         'otp': otp,
         'newPassword': newPassword,
-      }),
+      },
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode != 200 || payload['success'] != true) {
@@ -191,10 +273,9 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> verifyTokenWithBackend(String idToken) async {
-    final response = await http.post(
-      Uri.parse('$backendBaseUrl/api/auth/verify-token'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'idToken': idToken}),
+    final response = await _postBackend(
+      '/api/auth/verify-token',
+      body: {'idToken': idToken},
     );
 
     final payload = jsonDecode(response.body);
@@ -298,6 +379,67 @@ class AuthService {
     }
   }
 
+  /// Role lookup used after sign-in. The Firestore read and the backend
+  /// login start together, and the first successful result is used. When the
+  /// API answers first, its redirect is kept. When it is unreachable, the
+  /// Firestore role is used without waiting for the backend timeout.
+  Future<ResolvedLoginSession> resolveLoginSession() {
+    final completer = Completer<ResolvedLoginSession>();
+    var pending = 2;
+
+    void succeed(ResolvedLoginSession session) {
+      if (!completer.isCompleted) {
+        completer.complete(session);
+      }
+    }
+
+    void fail(Object error) {
+      pending -= 1;
+      debugPrint('Login role lookup failed: $error');
+      if (pending == 0 && !completer.isCompleted) {
+        completer.complete(const ResolvedLoginSession(role: 'student'));
+      }
+    }
+
+    _sessionFromBackend().then(
+      succeed,
+      onError: (Object error, StackTrace _) {
+        fail(error);
+      },
+    );
+    _sessionFromFirestore().then(
+      succeed,
+      onError: (Object error, StackTrace _) {
+        fail(error);
+      },
+    );
+    return completer.future;
+  }
+
+  Future<ResolvedLoginSession> _sessionFromFirestore() async {
+    final user = _firebaseAuth?.currentUser;
+    if (user == null) {
+      throw StateError('User must be logged in.');
+    }
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    final role = (userDoc.data()?['role'] as String?)?.trim().toLowerCase();
+    return ResolvedLoginSession(
+      role: role == null || role.isEmpty ? 'student' : role,
+    );
+  }
+
+  Future<ResolvedLoginSession> _sessionFromBackend() async {
+    final loginData = await loginWithRole();
+    final user = loginData['user'];
+    final role = user is Map ? user['role'] as String? : null;
+    final redirectRoute = loginData['redirectRoute'] as String?;
+    return ResolvedLoginSession(role: role, redirectRoute: redirectRoute);
+  }
+
   Future<bool> isModerator() async {
     final user = _firebaseAuth?.currentUser;
     if (user == null) {
@@ -337,12 +479,9 @@ class AuthService {
       throw Exception('Failed to get Firebase ID token.');
     }
 
-    final response = await http.post(
-      Uri.parse('$backendBaseUrl/api/auth/register-moderator'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'idToken': idToken,
-      }),
+    final response = await _postBackend(
+      '/api/auth/register-moderator',
+      body: {'idToken': idToken},
     );
 
     final payload = jsonDecode(response.body);
@@ -360,15 +499,14 @@ class AuthService {
       throw Exception('User must be logged in.');
     }
 
-    final idToken = await user.getIdToken(true);
+    final idToken = await user.getIdToken();
     if (idToken == null || idToken.isEmpty) {
       throw Exception('Failed to get Firebase ID token.');
     }
 
-    final response = await http.post(
-      Uri.parse('$backendBaseUrl/api/auth/login-with-role'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'idToken': idToken}),
+    final response = await _postBackend(
+      '/api/auth/login-with-role',
+      body: {'idToken': idToken},
     );
 
     final payload = jsonDecode(response.body);

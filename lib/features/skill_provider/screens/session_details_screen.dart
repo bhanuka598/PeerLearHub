@@ -130,7 +130,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
     final canManage = _isTeacher && session.status == SessionStatus.upcoming;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(title: 'Session Details'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -138,7 +138,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              decoration: AppTheme.cardDecoration,
+              decoration: AppTheme.teacherCardDecoration,
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +165,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
             if (canComplete) ...[
               const SizedBox(height: 16),
               Container(
-                decoration: AppTheme.cardDecoration,
+                decoration: AppTheme.teacherCardDecoration,
                 padding: const EdgeInsets.all(16),
                 child: const Text(
                   'This session has ended. Please mark it as completed so the learner can leave feedback.',

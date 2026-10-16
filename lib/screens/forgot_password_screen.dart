@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_service.dart';
+import '../core/router/app_navigation.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/auth/auth_ui.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -33,7 +35,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _emailController.text,
       );
       if (mounted) {
-        context.go(
+        context.push(
           '/otp-verification?email=${Uri.encodeComponent(_emailController.text.trim())}&mode=reset',
         );
       }
@@ -55,117 +57,152 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  onPressed: () => context.canPop() ? context.pop() : null,
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.iconBackground,
-                    foregroundColor: AppTheme.textPrimary,
-                  ),
+      body: AuthFormShell(
+        leading: const AuthBackButton(fallbackRoute: '/login'),
+        title: 'Forgot Password?',
+        subtitle:
+            "Enter your email address and we'll send you instructions to reset your password.",
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _ResetSteps(),
+              const SizedBox(height: 18),
+              const AuthFieldLabel('Email address'),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                onFieldSubmitted: (_) => _submit(),
+                decoration: authFieldDecoration(
+                  hint: 'you@example.com',
+                  icon: Icons.mail_outline_rounded,
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Forgot Password?',
-                  style: textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                  ),
+                validator: (value) {
+                  final email = (value ?? '').trim();
+                  if (email.isEmpty) {
+                    return 'Please enter your email address';
+                  }
+                  final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+                  if (!emailRegex.hasMatch(email)) {
+                    return 'Please enter a valid email address';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'A 6-digit verification code will be sent to this email.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  "Enter your email address and we'll send you instructions to reset your password.",
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: AppTheme.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Form(
-                  key: _formKey,
-                  child: TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email Address',
-                      hintText: 'Enter your email',
-                      prefixIcon: Icon(Icons.email_outlined),
-                    ),
-                    validator: (value) {
-                      final email = (value ?? '').trim();
-                      if (email.isEmpty) {
-                        return 'Please enter your email address';
-                      }
-                      final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
-                      if (!emailRegex.hasMatch(email)) {
-                        return 'Please enter a valid email address';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Text(
-                            'Send Verification Code',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => context.go('/login'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primaryColor,
-                      side: const BorderSide(color: AppTheme.primaryColor),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Back to Login',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+              const SizedBox(height: 18),
+              AuthPrimaryButton(
+                label: 'Send Verification Code',
+                isLoading: _isSubmitting,
+                onPressed: _isSubmitting ? null : _submit,
+              ),
+              const SizedBox(height: 10),
+              AuthSecondaryButton(
+                label: 'Back to Login',
+                onPressed: () => popOrGo(context, '/login'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResetSteps extends StatelessWidget {
+  const _ResetSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        _ResetStep(number: '1', label: 'Email', active: true),
+        _ResetStepLine(active: true),
+        _ResetStep(number: '2', label: 'Code'),
+        _ResetStepLine(),
+        _ResetStep(number: '3', label: 'Reset'),
+      ],
+    );
+  }
+}
+
+class _ResetStep extends StatelessWidget {
+  const _ResetStep({
+    required this.number,
+    required this.label,
+    this.active = false,
+  });
+
+  final String number;
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppTheme.primaryDark : const Color(0xFF8B9694);
+
+    return Column(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? AppTheme.iconBackground : const Color(0xFFF3F6F6),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: active ? AppTheme.primaryColor : const Color(0xFFD5E3E0),
             ),
           ),
+          child: Text(
+            number,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ResetStepLine extends StatelessWidget {
+  const _ResetStepLine({this.active = false});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 18),
+        child: Container(
+          height: 2,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          color: active ? AppTheme.primaryLight : const Color(0xFFD5E3E0),
         ),
       ),
     );

@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/app_auth.dart';
 import '../../../core/constants/app_colors.dart';
 import '../widgets/moderator_bottom_nav.dart';
 import '../widgets/moderator_app_bar.dart';
@@ -616,24 +618,22 @@ class _ModeratorProfileScreenState extends State<ModeratorProfileScreen> {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Logged out successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              Navigator.pop(dialogContext);
+              AppAuth.instance.logout();
+              if (context.mounted) {
+                context.go('/login');
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Logout'),

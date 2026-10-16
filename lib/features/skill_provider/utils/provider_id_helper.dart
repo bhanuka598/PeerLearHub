@@ -15,7 +15,7 @@ Future<String> resolveProviderId() async {
   if (user == null) {
     try {
       user = await FirebaseAuth.instance.authStateChanges().first.timeout(
-        const Duration(seconds: 5),
+        const Duration(milliseconds: 800),
       );
     } catch (e) {
       debugPrint('Auth restore wait failed: $e');

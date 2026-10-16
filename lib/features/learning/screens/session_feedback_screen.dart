@@ -5,6 +5,7 @@ import '../../skill_provider/models/provider_session.dart';
 import '../../skill_provider/services/review_service.dart';
 import '../../skill_provider/utils/display_utils.dart';
 import '../../skill_provider/widgets/app_header.dart';
+import '../../skill_provider/widgets/rating_stars.dart';
 
 class SessionFeedbackScreen extends StatefulWidget {
   const SessionFeedbackScreen({super.key, required this.session});
@@ -130,23 +131,33 @@ class _SessionFeedbackScreenState extends State<SessionFeedbackScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Your rating',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  'How was this session?',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Your stars and note appear on the teacher Ratings & Reviews page.',
+                  style: TextStyle(color: AppTheme.textSecondary, height: 1.35),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: List.generate(5, (index) {
-                    final star = index + 1;
-                    return IconButton(
-                      onPressed: !canSubmit || _saving
-                          ? null
-                          : () => setState(() => _rating = star),
-                      icon: Icon(
-                        star <= _rating ? Icons.star : Icons.star_border,
-                        color: Colors.amber,
-                      ),
-                    );
-                  }),
+                RatingStars(
+                  value: _rating.toDouble(),
+                  size: 36,
+                  enabled: canSubmit && !_saving,
+                  onChanged: (star) => setState(() => _rating = star),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: Text(
+                    ratingChoiceLabel(_rating),
+                    key: ValueKey(_rating),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: _rating == 0
+                          ? AppTheme.textSecondary
+                          : AppTheme.primaryDark,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(

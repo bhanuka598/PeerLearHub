@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../core/auth/app_auth.dart';
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
 import '../../../core/utils/lesson_image.dart';
@@ -485,10 +486,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       onQueryChanged: (value) =>
                           setState(() => _query = value),
                       onSubmitted: (value) => _recordSearchQuery(value),
-                      onProfile: () => context.go('/profile'),
+                      onProfile: () => context.push('/profile'),
                       onLogout: () {
                         AppAuth.instance.logout();
-                        context.go('/');
+                        context.go('/login');
                       },
                     ),
                   ),
@@ -1263,11 +1264,13 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isReportPreview ? 'Reported Course Preview' : 'Course details'),
-        leading: isReportPreview ? IconButton(
+        leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          tooltip: 'Back to Report',
-        ) : null,
+          tooltip: isReportPreview ? 'Back to Report' : 'Back',
+          onPressed: () => isReportPreview
+              ? Navigator.pop(context)
+              : popOrGo(context, '/learning'),
+        ),
         actions: [
           if (!isReportPreview)
             PopupMenuButton<String>(
@@ -1781,10 +1784,10 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
                     greeting: _firstName.isEmpty
                         ? 'Keep learning'
                         : 'Keep going, $_firstName',
-                    onProfile: () => context.go('/profile'),
+                    onProfile: () => context.push('/profile'),
                     onLogout: () {
                       AppAuth.instance.logout();
-                      context.go('/');
+                      context.go('/login');
                     },
                   ),
                 ),
@@ -1945,6 +1948,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.course.title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => popOrGo(context, '/learning/my-courses'),
+        ),
         actions: const [RoleSwitcherButton(), SizedBox(width: 4)],
       ),
       body: ListView(
@@ -2214,6 +2221,10 @@ class _QuizScreenState extends State<QuizScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.quiz.moduleTitle} Quiz'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => popOrGo(context, '/learning/my-courses'),
+        ),
         actions: const [RoleSwitcherButton()],
       ),
       body: ListView(

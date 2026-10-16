@@ -16,7 +16,7 @@ class BookingDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(title: 'Booking Details'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -24,7 +24,7 @@ class BookingDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              decoration: AppTheme.cardDecoration,
+              decoration: AppTheme.teacherCardDecoration,
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

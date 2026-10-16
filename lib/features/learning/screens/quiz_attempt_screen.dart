@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../skill_provider/models/assessment_status.dart';
 import '../../skill_provider/models/quiz.dart';
@@ -69,7 +70,7 @@ class _QuizAttemptScreenState extends State<QuizAttemptScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No published quiz available.')),
           );
-          context.pop();
+          popOrGo(context, '/learning');
         }
         return;
       }
@@ -213,6 +214,11 @@ class _QuizAttemptScreenState extends State<QuizAttemptScreen> {
         title: Text(quiz?.title ?? 'Quiz'),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          color: Colors.white,
+          onPressed: () => popOrGo(context, '/learning'),
+        ),
       ),
       body: _loading
           ? const Center(
@@ -237,7 +243,7 @@ class _QuizAttemptScreenState extends State<QuizAttemptScreen> {
                         ),
                         const SizedBox(height: 16),
                         FilledButton(
-                          onPressed: () => context.pop(),
+                          onPressed: () => popOrGo(context, '/learning'),
                           style: FilledButton.styleFrom(
                             backgroundColor: AppTheme.primaryColor,
                           ),

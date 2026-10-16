@@ -134,14 +134,21 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
     }
   }
 
+  void _openCreateLesson() {
+    context.push('/skill-provider/create');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isPhone = MediaQuery.sizeOf(context).width < 700;
+    final showCreate = _lessons.isNotEmpty && !_isLoading;
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: TealPageHeader(
         title: 'My Lessons',
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
+          preferredSize: const Size.fromHeight(52),
           child: TealFilterBar(
             filters: _filters,
             selectedFilter: _selectedFilter,
@@ -151,14 +158,15 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
           ),
         ),
       ),
-      floatingActionButton: _lessons.isNotEmpty
+      floatingActionButton: showCreate && !isPhone
           ? FloatingActionButton.extended(
-              onPressed: () {
-                context.push('/skill-provider/create');
-              },
+              onPressed: _openCreateLesson,
               icon: const Icon(Icons.add),
               label: const Text('Create Lesson'),
             )
+          : null,
+      bottomNavigationBar: showCreate && isPhone
+          ? _CreateLessonBar(onPressed: _openCreateLesson)
           : null,
       body: _isLoading
           ? const Center(
@@ -171,7 +179,9 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                   onRefresh: _loadLessons,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, isPhone ? 16 : 96),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 900),
@@ -180,6 +190,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                           children: [
                             TextField(
                               controller: _searchController,
+                              textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText: 'Search lessons by title...',
                                 prefixIcon: const Icon(Icons.search),
@@ -218,7 +229,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
 
   Widget _buildNoResultsState() {
     return Container(
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
@@ -240,6 +251,44 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CreateLessonBar extends StatelessWidget {
+  const _CreateLessonBar({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 8,
+      shadowColor: const Color(0x33064E48),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: FilledButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.add),
+            label: const Text('Create Lesson'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(48),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

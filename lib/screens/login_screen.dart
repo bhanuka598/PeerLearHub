@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
 import '../core/auth/auth_service.dart';
+import '../core/auth/welcome_store.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/auth/auth_ui.dart';
 import '../widgets/social_auth_button.dart';
@@ -19,15 +20,54 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _isGoogleSubmitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _emailFocus.addListener(_handleEmailFocus);
+    _passwordFocus.addListener(_handlePasswordFocus);
+  }
+
+  @override
   void dispose() {
+    _emailFocus.removeListener(_handleEmailFocus);
+    _passwordFocus.removeListener(_handlePasswordFocus);
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _handleEmailFocus() => _centerFocusedField(_emailFocus);
+
+  void _handlePasswordFocus() => _centerFocusedField(_passwordFocus);
+
+  void _centerFocusedField(FocusNode node) {
+    if (!node.hasFocus) {
+      return;
+    }
+
+    void reveal() {
+      final fieldContext = node.context;
+      if (fieldContext == null || !fieldContext.mounted) {
+        return;
+      }
+      Scrollable.ensureVisible(
+        fieldContext,
+        alignment: 0.42,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
+    Future<void>.delayed(const Duration(milliseconds: 320), reveal);
   }
 
   String? _validateEmail(String? value) {
@@ -62,25 +102,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) {
         return;
       }
-      
-      // Fetch user role from backend and send moderators straight to the dashboard.
-      try {
-        final loginData = await AuthService.instance.loginWithRole();
-        final roleString = loginData['user']['role'] as String?;
-        final redirectRoute = (loginData['redirectRoute'] as String?) ??
-            AppAuth.instance.getHomeRouteForRole(roleString);
 
-        AppAuth.instance.setRoleFromApi(roleString);
-        if (!mounted) return;
-        context.go(redirectRoute);
-        return;
-      } catch (e) {
-        final fallbackRole = await AuthService.instance.getCurrentUserRole();
-        AppAuth.instance.setRoleFromApi(fallbackRole);
-      }
-
+      final session = await AuthService.instance.resolveLoginSession();
+      final redirectRoute =
+          session.redirectRoute ??
+          AppAuth.instance.getHomeRouteForRole(session.role);
+      AppAuth.instance.setRoleFromApi(session.role);
       if (!mounted) return;
-      context.go(AppAuth.instance.getHomeRoute());
+      context.go(redirectRoute);
     } on FirebaseAuthException catch (error) {
       if (mounted) {
         _showError(AuthService.instance.authErrorMessage(error));
@@ -131,79 +160,114 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  InputDecoration _fieldDecoration({
-    required String label,
-    required String hint,
-    required IconData icon,
-    Widget? suffix,
-  }) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      prefixIcon: Icon(icon, color: AppTheme.primaryColor),
-      suffixIcon: suffix,
-      filled: true,
-      fillColor: const Color(0xFFF8FAFB),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE6EEF0)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE6EEF0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.8),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: AuthFormShell(
-        leading: AuthBackButton(
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
-        ),
+        leading: context.canPop()
+            ? const AuthBackButton(fallbackRoute: '/login')
+            : WelcomeStore.seen
+            ? const SizedBox(width: 44, height: 44)
+            : const AuthBackButton(fallbackRoute: '/welcome'),
         title: 'Welcome back',
-        subtitle:
-            'Sign in to continue learning and sharing skills with your community.',
-        footer: AuthFooterLink(
-          prompt: "Don't have an account?",
-          actionLabel: 'Sign up',
-          onTap: () => context.go('/register'),
+        subtitle: 'Sign in to continue learning and sharing skills.',
+        footer: Column(
+          children: [
+            AuthFooterLink(
+              prompt: "Don't have an account?",
+              actionLabel: 'Sign up',
+              onTap: () => context.push('/register'),
+            ),
+            const SizedBox(height: 8),
+            AuthQuietLink(
+              label: 'Register as Moderator',
+              onTap: () => context.push('/moderation/register'),
+            ),
+          ],
         ),
         child: Form(
           key: _formKey,
-          child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final screen = MediaQuery.sizeOf(context);
+              final compact =
+                  constraints.maxWidth < 360 || screen.height < 700;
+              final gap = compact ? 12.0 : 16.0;
+              final fieldScrollPadding = EdgeInsets.fromLTRB(
+                20,
+                screen.height * 0.16,
+                20,
+                MediaQuery.viewInsetsOf(context).bottom > 0
+                    ? screen.height * 0.28
+                    : 32,
+              );
+              return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const AuthFieldLabel('Email address'),
               TextFormField(
                 controller: _emailController,
+                focusNode: _emailFocus,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
-                decoration: _fieldDecoration(
-                  label: 'Email address',
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                scrollPadding: fieldScrollPadding,
+                decoration: authFieldDecoration(
                   hint: 'you@example.com',
-                  icon: Icons.email_outlined,
+                  icon: Icons.mail_outline_rounded,
                 ),
                 validator: _validateEmail,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: gap),
+              SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'Password',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/forgot-password'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _passwordController,
+                focusNode: _passwordFocus,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
+                scrollPadding: fieldScrollPadding,
                 onFieldSubmitted: (_) => _login(),
-                decoration: _fieldDecoration(
-                  label: 'Password',
+                decoration: authFieldDecoration(
                   hint: 'Enter your password',
-                  icon: Icons.lock_outline,
+                  icon: Icons.lock_outline_rounded,
                   suffix: IconButton(
                     onPressed: () {
                       setState(() => _obscurePassword = !_obscurePassword);
@@ -223,56 +287,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => context.go('/forgot-password'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.primaryColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  ),
-                  child: const Text(
-                    'Forgot password?',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
+              SizedBox(height: gap),
               AuthPrimaryButton(
                 label: 'Sign in',
                 isLoading: _isSubmitting,
                 onPressed: _isSubmitting ? null : _login,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: compact ? 14 : 20),
               const AuthSectionDivider(),
-              const SizedBox(height: 20),
+              SizedBox(height: gap),
               SocialAuthButton(
                 label: 'Continue with Google',
                 icon: Icons.g_mobiledata_rounded,
                 isLoading: _isGoogleSubmitting,
                 onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
               ),
-              const SizedBox(height: 12),
-              SocialAuthButton(
-                label: 'Continue with Apple',
-                icon: Icons.apple,
-                onPressed: () {},
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: () => context.go('/moderation/register'),
-                  child: const Text(
-                    'Register as Moderator',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
             ],
+              );
+            },
           ),
         ),
       ),

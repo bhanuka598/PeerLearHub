@@ -16,7 +16,25 @@ class BookingService extends ChangeNotifier {
   static const _collection = 'bookingRequests';
   final List<BookingRequest> _bookings = [];
 
-  Future<List<BookingRequest>> getBookingsByProvider(String providerId) async {
+  String? _cachedProviderId;
+  List<BookingRequest>? _cachedForProvider;
+  DateTime? _cacheFetchedAt;
+  static const _cacheMaxAge = Duration(seconds: 45);
+
+  void _invalidateProviderCache([String? providerId]) {
+    if (providerId == null ||
+        providerId == _cachedProviderId ||
+        _cachedProviderId == null) {
+      _cachedProviderId = null;
+      _cachedForProvider = null;
+      _cacheFetchedAt = null;
+    }
+  }
+
+  Future<List<BookingRequest>> getBookingsByProvider(
+    String providerId, {
+    bool forceRefresh = false,
+  }) async {
     if (useMockData) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       return _bookings
@@ -24,12 +42,34 @@ class BookingService extends ChangeNotifier {
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
-    final snapshot = await FirebaseFirestore.instance
-        .collection(_collection)
-        .where('providerId', isEqualTo: providerId)
-        .orderBy('createdAt', descending: true)
-        .get();
-    return snapshot.docs.map(BookingRequest.fromFirestore).toList();
+
+    final cacheFresh = !forceRefresh &&
+        _cachedProviderId == providerId &&
+        _cachedForProvider != null &&
+        _cacheFetchedAt != null &&
+        DateTime.now().difference(_cacheFetchedAt!) < _cacheMaxAge;
+    if (cacheFresh) {
+      return List<BookingRequest>.from(_cachedForProvider!);
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection(_collection)
+          .where('providerId', isEqualTo: providerId)
+          .get();
+      final list = snapshot.docs.map(BookingRequest.fromFirestore).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _cachedProviderId = providerId;
+      _cachedForProvider = list;
+      _cacheFetchedAt = DateTime.now();
+      return List<BookingRequest>.from(list);
+    } catch (e) {
+      debugPrint('Bookings load failed: $e');
+      if (_cachedProviderId == providerId && _cachedForProvider != null) {
+        return List<BookingRequest>.from(_cachedForProvider!);
+      }
+      rethrow;
+    }
   }
 
   Future<BookingRequest?> getBookingById(String id) async {
@@ -46,6 +86,7 @@ class BookingService extends ChangeNotifier {
   }
 
   Future<void> acceptBooking(String id) async {
+    _invalidateProviderCache();
     await _updateStatus(id, BookingStatus.accepted);
     final booking = await getBookingById(id);
     if (booking != null) {
@@ -54,10 +95,12 @@ class BookingService extends ChangeNotifier {
   }
 
   Future<void> declineBooking(String id) async {
+    _invalidateProviderCache();
     await _updateStatus(id, BookingStatus.declined);
   }
 
   Future<void> rescheduleBooking(String id, String reason) async {
+    _invalidateProviderCache();
     if (useMockData) {
       final index = _bookings.indexWhere((b) => b.id == id);
       if (index != -1) {

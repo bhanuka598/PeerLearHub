@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
+import '../core/auth/auth_service.dart';
+import '../core/auth/welcome_store.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/app_logo.dart';
 
@@ -21,10 +23,12 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _scale;
   late final Animation<double> _progress;
   late final Animation<Offset> _slide;
+  late final Future<String> _destination;
 
   @override
   void initState() {
     super.initState();
+    _destination = _resolveDestination();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -54,15 +58,51 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward().whenComplete(_openNext);
   }
 
-  void _openNext() {
+  Future<String> _resolveDestination() async {
+    final seenWelcome = await WelcomeStore.load();
+    final restoredHome = await _restoredHome();
+    if (restoredHome != null) {
+      if (!seenWelcome) {
+        await WelcomeStore.markSeen();
+      }
+      return restoredHome;
+    }
+
+    if (AppAuth.instance.currentRole != null) {
+      return AppAuth.instance.getHomeRoute();
+    }
+
+    return seenWelcome ? '/login' : '/welcome';
+  }
+
+  Future<String?> _restoredHome() async {
+    try {
+      final user = await AuthService.instance.currentUserOrNull();
+      if (user == null) {
+        return null;
+      }
+
+      final session = await AuthService.instance.resolveLoginSession().timeout(
+        const Duration(seconds: 5),
+      );
+      AppAuth.instance.setRoleFromApi(session.role);
+      return session.redirectRoute ?? AppAuth.instance.getHomeRoute();
+    } catch (error) {
+      debugPrint('Saved session was not restored: $error');
+      return null;
+    }
+  }
+
+  Future<void> _openNext() async {
     if (!mounted) {
       return;
     }
 
     SplashScreen.hasCompleted = true;
-    final destination = AppAuth.instance.currentRole != null
-        ? AppAuth.instance.getHomeRoute()
-        : '/welcome';
+    final destination = await _destination;
+    if (!mounted) {
+      return;
+    }
     context.go(destination);
   }
 

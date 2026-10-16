@@ -56,5 +56,6 @@ app.*.map.json
 backend/.env
 backend/.env.*
 !backend/.env.example
+lib/core/config/gemini_key.dart
 android/build/reports/problems/problems-report.html
 /android/build/reports/problems

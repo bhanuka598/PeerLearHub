@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
 import '../core/auth/auth_service.dart';
+import '../core/router/app_navigation.dart';
 import '../core/theme/app_theme.dart';
 
 class ModeratorRegisterScreen extends StatefulWidget {
@@ -150,7 +151,7 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  onPressed: () => context.canPop() ? context.pop() : null,
+                  onPressed: () => popOrGo(context, '/login'),
                   icon: const Icon(Icons.arrow_back_ios_new_rounded),
                   style: IconButton.styleFrom(
                     backgroundColor: AppTheme.iconBackground,
@@ -315,7 +316,7 @@ class _ModeratorRegisterScreenState extends State<ModeratorRegisterScreen> {
                               WidgetSpan(
                                 alignment: PlaceholderAlignment.middle,
                                 child: GestureDetector(
-                                  onTap: () => context.go('/login'),
+                                  onTap: () => context.push('/login'),
                                   child: Text(
                                     'Log In',
                                     style: textTheme.bodyMedium?.copyWith(

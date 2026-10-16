@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/router/app_navigation.dart';
 import '../models/moderation_report.dart';
 import '../../skill_provider/services/firebase_lesson_service.dart';
 import '../../learning/data/learning_store.dart';
@@ -188,7 +189,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => popOrGo(context, '/moderation'),
                       padding: const EdgeInsets.all(12),
                       constraints: const BoxConstraints(),
                     ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_service.dart';
+import '../core/router/app_navigation.dart';
 import '../core/theme/app_theme.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -137,7 +138,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  onPressed: () => context.canPop() ? context.pop() : null,
+                  onPressed: () => popOrGo(
+                    context,
+                    widget.isPasswordReset ? '/forgot-password' : '/register',
+                  ),
                   icon: const Icon(Icons.arrow_back_ios_new_rounded),
                   style: IconButton.styleFrom(
                     backgroundColor: AppTheme.iconBackground,

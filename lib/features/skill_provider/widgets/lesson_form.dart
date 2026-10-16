@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
 import '../../../core/utils/lesson_image.dart';
 import '../../../models/lesson.dart';
+import '../services/lesson_ai_service.dart';
 import '../services/storage_service.dart';
 import '../utils/pick_local_image.dart';
 
@@ -72,6 +75,7 @@ class LessonForm extends StatefulWidget {
 
 class LessonFormState extends State<LessonForm> {
   final _formKey = GlobalKey<FormState>();
+  final _titleFocusNode = FocusNode();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _preferredTimeController = TextEditingController();
@@ -91,6 +95,11 @@ class LessonFormState extends State<LessonForm> {
   Uint8List? _imageBytes;
   bool _isUploadingImage = false;
   bool _isSaving = false;
+  bool _isDrafting = false;
+  bool _isGeneratingThumbnail = false;
+  String? _lastAutoTitle;
+  Timer? _titleDebounce;
+  final Set<String> _userEdited = {};
   final Set<String> _selectedDays = {};
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -132,6 +141,7 @@ class LessonFormState extends State<LessonForm> {
   void initState() {
     super.initState();
     _populateFromLesson(widget.initialLesson);
+    _titleFocusNode.addListener(_onTitleFocusChanged);
   }
 
   void _populateFromLesson(Lesson? lesson) {
@@ -155,10 +165,269 @@ class LessonFormState extends State<LessonForm> {
     if (!lesson.isFree && lesson.price != null) {
       _priceController.text = lesson.price!.toStringAsFixed(2);
     }
+    _keepExistingContent(lesson);
+  }
+
+  void _keepExistingContent(Lesson lesson) {
+    if (lesson.description.trim().isNotEmpty) _userEdited.add('description');
+    if (lesson.learningOutcomes.isNotEmpty) _userEdited.add('outcomes');
+    _userEdited.add('category');
+    _userEdited.add('skillLevel');
+    if (_duration != null) _userEdited.add('duration');
+    _userEdited.add('lessonType');
+    if (lesson.learningMaterials.isNotEmpty) _userEdited.add('materials');
+    if (lesson.imageUrl != null && lesson.imageUrl!.trim().isNotEmpty) {
+      _userEdited.add('thumbnail');
+    }
+  }
+
+  void _onTitleFocusChanged() {
+    if (_titleFocusNode.hasFocus || isEditing) return;
+    _titleDebounce?.cancel();
+    _titleDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted || _titleFocusNode.hasFocus || isEditing || _isDrafting) return;
+      final title = _titleController.text.trim();
+      if (!_titleIsReady(title) || title == _lastAutoTitle) return;
+      _fillFromTitle(auto: true);
+    });
+  }
+
+  bool _titleIsReady(String title) {
+    final words = title.split(RegExp(r'\s+')).where((word) => word.isNotEmpty);
+    return title.length >= 8 && words.length >= 2;
+  }
+
+  bool _canWrite(String field) => !_userEdited.contains(field);
+
+  void _markEdited(String field) => _userEdited.add(field);
+
+  Future<void> _fillFromTitle({required bool auto}) async {
+    final title = _titleController.text.trim();
+    if (!_titleIsReady(title)) {
+      if (!auto && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Add a lesson title of a few words first.')),
+        );
+      }
+      return;
+    }
+    if (_isDrafting) return;
+    _titleDebounce?.cancel();
+
+    final replaceThumbnail = _canWrite('thumbnail');
+    setState(() => _isDrafting = true);
+    try {
+      final draft = await LessonAiService.draftLesson(
+        title: title,
+        includeThumbnail: replaceThumbnail,
+      );
+      if (!mounted) return;
+      final wroteText = _applyDraftText(draft);
+      var wroteThumbnail = false;
+      if (replaceThumbnail && draft.thumbnailBytes != null) {
+        wroteThumbnail = await _storeThumbnail(
+          draft.thumbnailBytes!,
+          mimeType: draft.thumbnailMimeType,
+          fromUser: false,
+        );
+      }
+      if (!mounted) return;
+      if (auto) _lastAutoTitle = title;
+      _showDraftResult(
+        wroteText: wroteText,
+        wroteThumbnail: wroteThumbnail,
+        wantedThumbnail: replaceThumbnail,
+        thumbnailError: draft.thumbnailError,
+      );
+    } on LessonAiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not fill with AI. You can still complete the form yourself.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDrafting = false);
+    }
+  }
+
+  bool _applyDraftText(LessonAiDraft draft) {
+    var wrote = false;
+    if (_canWrite('description') && draft.description != null) {
+      _descriptionController.text = draft.description!;
+      wrote = true;
+    }
+    if (_canWrite('outcomes') && draft.learningOutcomes.isNotEmpty) {
+      _outcomesController.text = draft.learningOutcomes.join('\n');
+      wrote = true;
+    }
+    if (_canWrite('materials') && draft.learningMaterials.isNotEmpty) {
+      _materialsController.text = draft.learningMaterials.join('\n');
+      wrote = true;
+    }
+
+    final category = _matchLabel(LessonCategory.values, draft.category, (item) => item.label);
+    final skillLevel = _matchLabel(SkillLevel.values, draft.skillLevel, (item) => item.label);
+    final lessonType = _matchLabel(LessonType.values, draft.lessonType, (item) => item.label);
+    final duration = _durationOptions.contains(draft.duration) ? draft.duration : null;
+
+    setState(() {
+      if (_canWrite('category') && category != null) {
+        _category = category;
+        wrote = true;
+      }
+      if (_canWrite('skillLevel') && skillLevel != null) {
+        _skillLevel = skillLevel;
+        wrote = true;
+      }
+      if (_canWrite('duration') && duration != null) {
+        _duration = duration;
+        wrote = true;
+      }
+      if (_canWrite('lessonType') && lessonType != null) {
+        _lessonType = lessonType;
+        wrote = true;
+      }
+    });
+    return wrote;
+  }
+
+  T? _matchLabel<T>(List<T> values, String? label, String Function(T value) read) {
+    if (label == null) return null;
+    final needle = label.trim().toLowerCase();
+    for (final value in values) {
+      if (read(value).toLowerCase() == needle) return value;
+    }
+    return null;
+  }
+
+  void _showDraftResult({
+    required bool wroteText,
+    required bool wroteThumbnail,
+    required bool wantedThumbnail,
+    String? thumbnailError,
+  }) {
+    if (!mounted) return;
+    final String message;
+    if (!wroteText && !wroteThumbnail) {
+      message = 'Your edits were kept. Clear a field you want AI to fill.';
+    } else if (wroteText && wantedThumbnail && !wroteThumbnail) {
+      message = thumbnailError ??
+          'Lesson details filled. You can edit them, or add a thumbnail from your gallery.';
+    } else {
+      message = 'AI filled the lesson details. You can edit any of them.';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _generateThumbnailWithAi() async {
+    final title = _titleController.text.trim();
+    if (!_titleIsReady(title)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a lesson title of a few words first.')),
+      );
+      return;
+    }
+    if (_isGeneratingThumbnail || _isDrafting) return;
+
+    setState(() => _isGeneratingThumbnail = true);
+    try {
+      final draft = await LessonAiService.draftLesson(
+        title: title,
+        includeText: false,
+        includeThumbnail: true,
+      );
+      if (!mounted) return;
+      if (draft.thumbnailBytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not generate a thumbnail. You can add one from your gallery.'),
+          ),
+        );
+        return;
+      }
+      final stored = await _storeThumbnail(
+        draft.thumbnailBytes!,
+        mimeType: draft.thumbnailMimeType,
+        fromUser: false,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            stored
+                ? 'Thumbnail generated. You can still replace it.'
+                : 'Could not prepare the thumbnail. Try again or add one from your gallery.',
+          ),
+        ),
+      );
+    } on LessonAiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not generate a thumbnail. You can add one from your gallery.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGeneratingThumbnail = false);
+    }
+  }
+
+  Future<bool> _storeThumbnail(
+    Uint8List bytes, {
+    required String? mimeType,
+    required bool fromUser,
+  }) async {
+    if (!mounted) return false;
+    setState(() {
+      _imageBytes = bytes;
+      _isUploadingImage = true;
+      if (fromUser) _userEdited.add('thumbnail');
+    });
+
+    final lessonId = widget.initialLesson?.id ??
+        'draft_${DateTime.now().millisecondsSinceEpoch}';
+    final url = await StorageService.instance.uploadLessonImage(
+      lessonId: lessonId,
+      bytes: bytes,
+      fileName: _thumbnailFileName(mimeType),
+    );
+    if (!mounted) return false;
+    setState(() => _isUploadingImage = false);
+    if (url == null) {
+      return false;
+    }
+    setState(() => _imageUrl = url);
+    return true;
+  }
+
+  String _thumbnailFileName(String? mimeType) {
+    final mime = (mimeType ?? '').toLowerCase();
+    if (mime.contains('png')) return 'thumbnail.png';
+    if (mime.contains('webp')) return 'thumbnail.webp';
+    if (mime.contains('gif')) return 'thumbnail.gif';
+    return 'thumbnail.jpg';
   }
 
   @override
   void dispose() {
+    _titleDebounce?.cancel();
+    _titleFocusNode.removeListener(_onTitleFocusChanged);
+    _titleFocusNode.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
     _preferredTimeController.dispose();
@@ -338,60 +607,40 @@ class LessonFormState extends State<LessonForm> {
   }
 
   Future<void> _pickAndUploadThumbnail() async {
-    if (_isUploadingImage) return;
+    if (_isUploadingImage || _isGeneratingThumbnail) return;
 
     try {
       final picked = await pickLocalImage();
-      if (picked == null) return;
+      if (picked == null || !mounted) return;
 
       final bytes = picked.bytes;
       if (bytes.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not read the selected image.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read the selected image.')),
+        );
         return;
       }
 
-      setState(() {
-        _imageBytes = bytes;
-        _isUploadingImage = true;
-      });
-
-      final lessonId = widget.initialLesson?.id ??
-          'draft_${DateTime.now().millisecondsSinceEpoch}';
-      final fileName =
-          picked.fileName.isNotEmpty ? picked.fileName : 'thumbnail.jpg';
-      final url = await StorageService.instance.uploadLessonImage(
-        lessonId: lessonId,
-        bytes: bytes,
-        fileName: fileName,
+      final stored = await _storeThumbnail(
+        bytes,
+        mimeType: picked.fileName,
+        fromUser: true,
       );
-
       if (!mounted) return;
-
-      if (url != null) {
-        setState(() => _imageUrl = url);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thumbnail added successfully.')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not prepare the thumbnail. Try a smaller image.'),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            stored
+                ? 'Thumbnail added successfully.'
+                : 'Could not prepare the thumbnail. Try a smaller image.',
           ),
-        );
-      }
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open the file picker.')),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isUploadingImage = false);
       }
     }
   }
@@ -413,11 +662,13 @@ class LessonFormState extends State<LessonForm> {
               children: [
                 TextFormField(
                   controller: _titleController,
+                  focusNode: _titleFocusNode,
                   decoration: const InputDecoration(
                     labelText: 'Lesson Title *',
                     hintText: 'Introduction to Flutter Development',
                   ),
                   textInputAction: TextInputAction.next,
+                  onEditingComplete: () => _titleFocusNode.unfocus(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Lesson title is required.';
@@ -425,9 +676,32 @@ class LessonFormState extends State<LessonForm> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _isDrafting ? null : () => _fillFromTitle(auto: false),
+                    icon: _isDrafting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome, size: 18),
+                    label: Text(_isDrafting ? 'Filling with AI...' : 'Fill with AI'),
+                  ),
+                ),
+                Text(
+                  'Uses the title to suggest the lesson details. You can edit them. Availability and pricing stay for you to set.',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
+                  onChanged: (_) => _markEdited('description'),
                   decoration: const InputDecoration(
                     labelText: 'Description *',
                     hintText: 'Describe what learners will gain from this lesson',
@@ -444,6 +718,7 @@ class LessonFormState extends State<LessonForm> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _outcomesController,
+                  onChanged: (_) => _markEdited('outcomes'),
                   decoration: const InputDecoration(
                     labelText: 'Learning Outcomes *',
                     hintText: 'One outcome per line',
@@ -455,6 +730,7 @@ class LessonFormState extends State<LessonForm> {
                 const SizedBox(height: 16),
                 _buildResponsivePair(
                   DropdownButtonFormField<LessonCategory>(
+                    key: ValueKey('category-$_category'),
                     initialValue: _category,
                     decoration: const InputDecoration(labelText: 'Category *'),
                     items: LessonCategory.values
@@ -465,7 +741,10 @@ class LessonFormState extends State<LessonForm> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) => setState(() => _category = value),
+                    onChanged: (value) => setState(() {
+                      _markEdited('category');
+                      _category = value;
+                    }),
                     validator: (value) {
                       if (value == null) {
                         return 'Please select a category.';
@@ -474,6 +753,7 @@ class LessonFormState extends State<LessonForm> {
                     },
                   ),
                   DropdownButtonFormField<SkillLevel>(
+                    key: ValueKey('skill-$_skillLevel'),
                     initialValue: _skillLevel,
                     decoration: const InputDecoration(labelText: 'Skill Level *'),
                     items: SkillLevel.values
@@ -484,7 +764,10 @@ class LessonFormState extends State<LessonForm> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) => setState(() => _skillLevel = value),
+                    onChanged: (value) => setState(() {
+                      _markEdited('skillLevel');
+                      _skillLevel = value;
+                    }),
                     validator: (value) {
                       if (value == null) {
                         return 'Please select a skill level.';
@@ -495,6 +778,7 @@ class LessonFormState extends State<LessonForm> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
+                  key: ValueKey('duration-$_duration'),
                   initialValue:
                       _durationOptions.contains(_duration) ? _duration : null,
                   decoration: const InputDecoration(labelText: 'Duration *'),
@@ -506,7 +790,10 @@ class LessonFormState extends State<LessonForm> {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) => setState(() => _duration = value),
+                  onChanged: (value) => setState(() {
+                    _markEdited('duration');
+                    _duration = value;
+                  }),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please select a duration.';
@@ -567,6 +854,7 @@ class LessonFormState extends State<LessonForm> {
               children: [
                 _buildResponsivePair(
                   DropdownButtonFormField<LessonType>(
+                    key: ValueKey('lesson-type-$_lessonType'),
                     initialValue: _lessonType,
                     decoration: const InputDecoration(labelText: 'Lesson Type *'),
                     items: LessonType.values
@@ -577,7 +865,10 @@ class LessonFormState extends State<LessonForm> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) => setState(() => _lessonType = value),
+                    onChanged: (value) => setState(() {
+                      _markEdited('lessonType');
+                      _lessonType = value;
+                    }),
                     validator: (value) {
                       if (value == null) {
                         return 'Please select a lesson type.';
@@ -663,6 +954,7 @@ class LessonFormState extends State<LessonForm> {
             subtitle: 'Optional resources learners can use before or after class.',
             child: TextFormField(
               controller: _materialsController,
+              onChanged: (_) => _markEdited('materials'),
               decoration: const InputDecoration(
                 labelText: 'Materials (one per line)',
                 hintText: 'PDF links, resource names, etc.',
@@ -705,7 +997,28 @@ class LessonFormState extends State<LessonForm> {
             icon: Icons.image_outlined,
             title: 'Lesson Thumbnail',
             subtitle: 'A clear cover image helps your lesson stand out.',
-            child: _buildImagePlaceholder(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildImagePlaceholder(),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: (_isGeneratingThumbnail || _isDrafting || _isUploadingImage)
+                      ? null
+                      : _generateThumbnailWithAi,
+                  icon: _isGeneratingThumbnail
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(
+                    _isGeneratingThumbnail ? 'Generating thumbnail...' : 'Generate with AI',
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           _buildActionButtons(),
@@ -717,11 +1030,7 @@ class LessonFormState extends State<LessonForm> {
   Widget _buildPageIntro() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.iconBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.35)),
-      ),
+      decoration: AppTheme.teacherTintedCard(AppTheme.primaryColor),
       child: Row(
         children: [
           Container(
@@ -773,7 +1082,7 @@ class LessonFormState extends State<LessonForm> {
     required Widget child,
   }) {
     return Container(
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -785,8 +1094,8 @@ class LessonFormState extends State<LessonForm> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.iconBackground,
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: AppTheme.primaryColor, size: 20),
               ),
@@ -915,13 +1224,13 @@ class LessonFormState extends State<LessonForm> {
   }) {
     return Material(
       color: selected ? AppTheme.iconBackground : Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
             border: Border.all(
               color: selected ? AppTheme.primaryColor : Colors.grey.shade300,
               width: selected ? 1.6 : 1,
@@ -982,19 +1291,22 @@ class LessonFormState extends State<LessonForm> {
   Widget _buildImagePlaceholder() {
     final hasPreview = _imageBytes != null;
     final hasImage = hasPreview || lessonImageProvider(_imageUrl) != null;
+    final busy = _isUploadingImage ||
+        _isGeneratingThumbnail ||
+        (_isDrafting && _canWrite('thumbnail'));
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _isUploadingImage ? null : _pickAndUploadThumbnail,
-        borderRadius: BorderRadius.circular(12),
+        onTap: busy ? null : _pickAndUploadThumbnail,
+        borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
         child: Ink(
           height: 176,
           decoration: BoxDecoration(
             color: hasImage
                 ? Colors.black
                 : AppTheme.iconBackground.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
             border: Border.all(
               color: hasImage
                   ? Colors.transparent
@@ -1002,13 +1314,13 @@ class LessonFormState extends State<LessonForm> {
             ),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
             child: hasImage
                 ? Stack(
                     fit: StackFit.expand,
                     children: [
                       _thumbnailPreview(),
-                      if (_isUploadingImage)
+                      if (busy)
                         const ColoredBox(
                           color: Color(0x66000000),
                           child: Center(
@@ -1043,15 +1355,22 @@ class LessonFormState extends State<LessonForm> {
                               color: Colors.white,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.add_photo_alternate_outlined,
-                              size: 26,
-                              color: AppTheme.primaryColor,
-                            ),
+                            child: busy
+                                ? const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(
+                                    Icons.add_photo_alternate_outlined,
+                                    size: 26,
+                                    color: AppTheme.primaryColor,
+                                  ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Tap to add a lesson thumbnail',
+                            busy
+                                ? 'Creating a thumbnail...'
+                                : 'Tap to add a lesson thumbnail',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppTheme.textPrimary,
                                   fontWeight: FontWeight.w600,
@@ -1076,7 +1395,7 @@ class LessonFormState extends State<LessonForm> {
 
   Widget _buildActionButtons() {
     return Container(
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       padding: const EdgeInsets.all(20),
       child: LayoutBuilder(
         builder: (context, constraints) {

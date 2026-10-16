@@ -25,6 +25,60 @@ class AppTheme {
     colors: [primaryColor, primaryLight],
   );
 
+  /// Visual tokens used only by the teacher (skill provider) area.
+  static const Color teacherAccentEmerald = Color(0xFF059669);
+  static const Color teacherAccentAmber = Color(0xFFD97706);
+  static const Color teacherAccentCoral = Color(0xFFE11D48);
+  static const Color teacherAccentIndigo = Color(0xFF4F46E5);
+  static const Color teacherAccentViolet = Color(0xFF7C3AED);
+  static const Color teacherAccentSky = Color(0xFF0284C7);
+  static const Color teacherPageBackground = Color(0xFFF1F6F5);
+  static const double teacherCardRadius = 18;
+
+  static const LinearGradient teacherHeaderGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF064E48),
+      Color(0xFF0F766E),
+      Color(0xFF2DD4BF),
+    ],
+    stops: [0.0, 0.48, 1.0],
+  );
+
+  static BoxDecoration get teacherCardDecoration => BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(teacherCardRadius),
+        border: Border.all(color: const Color(0xFFE3EEEC)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F766E).withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      );
+
+  static BoxDecoration teacherTintedCard(Color accent) => BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: 0.16),
+            Colors.white,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(teacherCardRadius),
+        border: Border.all(color: accent.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      );
+
   static BoxDecoration get cardDecoration => BoxDecoration(
     color: cardColor,
     borderRadius: BorderRadius.circular(12),

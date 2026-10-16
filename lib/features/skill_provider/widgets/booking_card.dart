@@ -28,10 +28,10 @@ class BookingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       child: InkWell(
         onTap: () => context.push('/skill-provider/booking', extra: booking),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.teacherCardRadius),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -40,12 +40,15 @@ class BookingCard extends StatelessWidget {
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: AppTheme.iconBackground,
+                    backgroundColor: AppTheme.teacherAccentAmber.withValues(alpha: 0.16),
                     child: Text(
                       booking.learnerName.isNotEmpty
                           ? booking.learnerName[0]
                           : '?',
-                      style: const TextStyle(color: AppTheme.primaryColor),
+                      style: const TextStyle(
+                        color: AppTheme.teacherAccentAmber,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

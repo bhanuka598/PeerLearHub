@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../skill_provider/models/assessment_status.dart';
 import '../../skill_provider/models/assignment.dart';
@@ -138,6 +139,10 @@ class _AssignmentSubmitScreenState extends State<AssignmentSubmitScreen> {
         title: Text(assignment?.title ?? 'Submit Assignment'),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => popOrGo(context, '/learning'),
+        ),
       ),
       body: _loading
           ? const Center(

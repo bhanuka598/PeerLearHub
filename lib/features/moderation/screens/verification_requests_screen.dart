@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/router/app_navigation.dart';
 import '../models/verification_request.dart';
 import '../services/verification_service.dart';
 import '../widgets/moderator_bottom_nav.dart';
@@ -161,7 +162,7 @@ class _VerificationRequestsScreenState
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => popOrGo(context, '/moderation'),
                       padding: const EdgeInsets.all(12),
                       constraints: const BoxConstraints(),
                     ),

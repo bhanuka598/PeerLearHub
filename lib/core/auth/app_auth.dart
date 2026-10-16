@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:peer_learn_hub/core/auth/auth_service.dart';
+import 'package:peer_learn_hub/features/notifications/services/session_reminder_scheduler.dart';
+import 'package:peer_learn_hub/features/skill_provider/services/session_automation_service.dart';
 
 enum AppUserRole { student, teacher, moderator, admin }
 
@@ -33,6 +37,9 @@ class AppAuth extends ChangeNotifier {
 
   void setRole(AppUserRole role) {
     _currentRole = role;
+    SessionReminderScheduler.instance.activate();
+    SessionAutomationService.instance.start();
+    unawaited(SessionReminderScheduler.instance.syncForCurrentUser());
     notifyListeners();
   }
 
@@ -73,15 +80,8 @@ class AppAuth extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     final signedIn = await AuthService.instance.signInWithGoogle();
     if (signedIn) {
-      // Prefer the backend role when available, but fall back to the saved Firestore role.
-      try {
-        final loginData = await AuthService.instance.loginWithRole();
-        final roleString = loginData['user']['role'] as String?;
-        setRoleFromApi(roleString);
-      } catch (e) {
-        debugPrint('Failed to fetch user role from backend: $e');
-        setRoleFromApi(await AuthService.instance.getCurrentUserRole());
-      }
+      final session = await AuthService.instance.resolveLoginSession();
+      setRoleFromApi(session.role);
     }
     return signedIn;
   }
@@ -103,6 +103,9 @@ class AppAuth extends ChangeNotifier {
 
   void logout() {
     _currentRole = null;
+    SessionReminderScheduler.instance.deactivate();
+    SessionAutomationService.instance.stop();
+    unawaited(SessionReminderScheduler.instance.cancelAll());
     AuthService.instance.signOut();
     notifyListeners();
   }

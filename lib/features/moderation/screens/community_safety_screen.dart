@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/router/app_navigation.dart';
 import '../services/community_safety_service.dart';
 import '../widgets/moderator_app_bar.dart';
 
@@ -74,7 +75,7 @@ class _CommunitySafetyScreenState extends State<CommunitySafetyScreen> {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => popOrGo(context, '/moderation'),
                         padding: const EdgeInsets.all(12),
                         constraints: const BoxConstraints(),
                       ),

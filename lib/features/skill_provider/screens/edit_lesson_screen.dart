@@ -61,7 +61,7 @@ class _EditLessonScreenState extends State<EditLessonScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(
         title: 'Edit Lesson',
       ),

@@ -1,12 +1,14 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:peer_learn_hub/core/auth/welcome_store.dart';
 import 'package:peer_learn_hub/core/router/app_router.dart';
 import 'package:peer_learn_hub/core/theme/app_theme.dart';
-import 'package:peer_learn_hub/features/skill_provider/services/session_automation_service.dart';
+import 'package:peer_learn_hub/features/notifications/services/session_reminder_scheduler.dart';
 import 'package:peer_learn_hub/firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await WelcomeStore.load();
 
   try {
     await Firebase.initializeApp(
@@ -16,7 +18,12 @@ Future<void> main() async {
     debugPrint('Firebase initialization error: $error\n$stackTrace');
   }
 
-  SessionAutomationService.instance.start();
+  try {
+    await SessionReminderScheduler.instance.initialize();
+  } catch (error, stackTrace) {
+    debugPrint('Reminder scheduler initialization error: $error\n$stackTrace');
+  }
+
   runApp(const PeerLearnHub());
 }
 

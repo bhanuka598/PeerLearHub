@@ -220,7 +220,7 @@ class _AssignmentAuthoringScreenState extends State<AssignmentAuthoringScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(title: 'Manage Assignment'),
       body: _loading
           ? const Center(

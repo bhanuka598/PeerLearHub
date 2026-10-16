@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lesson_display_utils.dart';
 import '../../../core/utils/lesson_image.dart';
@@ -12,6 +13,7 @@ import '../../../models/lesson.dart';
 import '../../skill_provider/models/review.dart';
 import '../../skill_provider/services/firebase_lesson_service.dart';
 import '../../skill_provider/services/review_service.dart';
+import '../../skill_provider/widgets/rating_stars.dart';
 import '../../skill_provider/widgets/review_card.dart';
 import '../../skill_provider/widgets/status_chip.dart';
 import '../data/student_lesson_store.dart';
@@ -202,11 +204,13 @@ class _StudentLessonDetailsScreenState
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: Text(widget.isReportPreview ? 'Reported Lesson Preview' : 'Lesson details'),
-        leading: widget.isReportPreview ? IconButton(
+        leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          tooltip: 'Back to Report',
-        ) : null,
+          tooltip: widget.isReportPreview ? 'Back to Report' : 'Back',
+          onPressed: () => widget.isReportPreview
+              ? Navigator.pop(context)
+              : popOrGo(context, '/learning'),
+        ),
         actions: [
           if (!widget.isReportPreview)
             IconButton(
@@ -786,22 +790,28 @@ class _StudentLessonDetailsScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Your rating will appear on the teacher Ratings & Reviews page.',
-            style: TextStyle(color: AppTheme.textSecondary),
+            'A quick rating helps the next learner, and it shows on the teacher Ratings & Reviews page.',
+            style: TextStyle(color: AppTheme.textSecondary, height: 1.35),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: List.generate(5, (index) {
-              final star = index + 1;
-              return IconButton(
-                onPressed: _saving ? null : () => setState(() => _rating = star),
-                icon: Icon(
-                  star <= _rating ? Icons.star : Icons.star_border,
-                  color: Colors.amber,
-                  size: 32,
-                ),
-              );
-            }),
+          const SizedBox(height: 4),
+          RatingStars(
+            value: _rating.toDouble(),
+            size: 34,
+            enabled: !_saving,
+            onChanged: (star) => setState(() => _rating = star),
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: Text(
+              ratingChoiceLabel(_rating),
+              key: ValueKey(_rating),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: _rating == 0
+                    ? AppTheme.textSecondary
+                    : AppTheme.primaryDark,
+              ),
+            ),
           ),
           TextField(
             controller: _commentController,

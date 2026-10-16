@@ -293,7 +293,7 @@ class _QuizAuthoringScreenState extends State<QuizAuthoringScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.teacherPageBackground,
       appBar: const TealPageHeader(title: 'Manage Quiz'),
       body: _loading
           ? const Center(
@@ -468,7 +468,7 @@ class _QuestionEditor extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
-      decoration: AppTheme.cardDecoration,
+      decoration: AppTheme.teacherCardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

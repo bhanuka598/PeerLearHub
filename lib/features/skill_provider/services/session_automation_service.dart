@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../notifications/models/app_notification.dart';
 import '../../notifications/services/notification_service.dart';
+import '../../notifications/services/session_reminder_scheduler.dart';
 import '../models/provider_session.dart';
 import '../utils/display_utils.dart';
 import '../utils/session_time_utils.dart';
@@ -54,6 +55,11 @@ class SessionAutomationService {
       final sessions = await _sessions.getSessionsForAutomation();
       for (final session in sessions) {
         await _processSession(session, now);
+      }
+      try {
+        await SessionReminderScheduler.instance.syncLoadedSessions(sessions);
+      } catch (e) {
+        debugPrint('Device reminder sync skipped: $e');
       }
     } catch (e) {
       debugPrint('Session automation tick skipped: $e');

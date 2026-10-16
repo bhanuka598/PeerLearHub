@@ -29,6 +29,26 @@ bool isWithin1hReminderWindow(DateTime scheduledAt, DateTime now) {
   return !now.isBefore(scheduledAt.subtract(const Duration(hours: 1)));
 }
 
+/// Future reminder instants for a session. Times already in the past are omitted
+/// so a closed app does not fire a late reminder again on the next launch.
+List<({String kind, DateTime when})> deviceReminderTimes(
+  DateTime scheduledAt,
+  DateTime now,
+) {
+  if (!scheduledAt.isAfter(now)) return const [];
+
+  final slots = <({String kind, DateTime when})>[];
+  final dayBefore = scheduledAt.subtract(const Duration(hours: 24));
+  final hourBefore = scheduledAt.subtract(const Duration(hours: 1));
+  if (dayBefore.isAfter(now)) {
+    slots.add((kind: '24h', when: dayBefore));
+  }
+  if (hourBefore.isAfter(now)) {
+    slots.add((kind: '1h', when: hourBefore));
+  }
+  return slots;
+}
+
 bool hasSessionEnded(ProviderSession session, [DateTime? now]) {
   return !(now ?? DateTime.now()).isBefore(sessionEndTime(session));
 }

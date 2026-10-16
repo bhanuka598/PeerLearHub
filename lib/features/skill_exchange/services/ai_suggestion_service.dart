@@ -126,7 +126,7 @@ Return ONLY raw JSON, with no markdown code fences or other text.
     if (parsedList == null && _envGeminiApiKey.isNotEmpty) {
       try {
         final directEndpoint =
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_envGeminiApiKey';
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$_envGeminiApiKey';
         final response = await http
             .post(
               Uri.parse(directEndpoint),

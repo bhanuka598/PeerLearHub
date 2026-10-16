@@ -130,7 +130,7 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
-              context.go('/profile');
+              context.push('/profile');
             },
             tooltip: 'Profile',
           ),
@@ -138,7 +138,7 @@ class _SkillExchangeDashboardScreenState extends State<SkillExchangeDashboardScr
             icon: const Icon(Icons.logout),
             onPressed: () {
               AppAuth.instance.logout();
-              context.go('/');
+              context.go('/login');
             },
             tooltip: 'Logout',
           ),

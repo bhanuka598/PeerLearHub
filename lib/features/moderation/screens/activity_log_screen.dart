@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/router/app_navigation.dart';
 import '../models/moderation_activity.dart';
 import '../screens/moderation_actions_screen.dart';
-import '../screens/moderator_dashboard_screen.dart';
 import '../services/activity_log_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/moderator_bottom_nav.dart';
@@ -468,18 +468,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
-                        onPressed: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          } else {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ModeratorDashboardScreen(),
-                              ),
-                            );
-                          }
-                        },
+                        onPressed: () => popOrGo(context, '/moderation'),
                         padding: const EdgeInsets.all(10),
                         constraints: const BoxConstraints(),
                       ),

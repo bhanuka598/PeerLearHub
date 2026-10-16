@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/auth/app_auth.dart';
+import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/role_switcher_button.dart';
 import '../../notifications/widgets/notification_bell_button.dart';
@@ -33,8 +35,15 @@ class TealDashboardHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: AppTheme.headerGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        gradient: AppTheme.teacherHeaderGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x33064E48),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: SafeArea(
         bottom: false,
@@ -77,9 +86,10 @@ class TealDashboardHeader extends StatelessWidget {
                       children: [
                         Text(
                           welcomeTitle,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
                               ),
                         ),
                         const SizedBox(height: 4),
@@ -178,13 +188,36 @@ class TealPageHeader extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppTheme.primaryColor,
+      backgroundColor: Colors.transparent,
       foregroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
+      scrolledUnderElevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+      ),
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: AppTheme.teacherHeaderGradient,
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33064E48),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+      ),
       leading: showBackButton
           ? IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => popOrGo(
+                context,
+                AppAuth.instance.currentRole == null
+                    ? '/login'
+                    : AppAuth.instance.getHomeRoute(),
+              ),
             )
           : null,
       automaticallyImplyLeading: showBackButton,
@@ -192,7 +225,8 @@ class TealPageHeader extends StatelessWidget implements PreferredSizeWidget {
         title,
         style: const TextStyle(
           color: Colors.white,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
         ),
       ),
       actions: actions,
@@ -231,13 +265,24 @@ class TealFilterBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 child: Ink(
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : Colors.transparent,
+                    color: isSelected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isSelected
                           ? Colors.white
-                          : Colors.white.withValues(alpha: 0.75),
+                          : Colors.white.withValues(alpha: 0.45),
                     ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -290,12 +335,26 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              gradient: AppTheme.teacherHeaderGradient,
+              borderRadius: BorderRadius.circular(4),
             ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+          ),
+        ],
       ),
     );
   }

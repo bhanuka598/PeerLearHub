@@ -290,7 +290,7 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
             icon: const Icon(Icons.logout_rounded, color: Colors.black87, size: 22),
             onPressed: () {
               AppAuth.instance.logout();
-              context.go('/');
+              context.go('/login');
             },
             tooltip: 'Logout',
           ),

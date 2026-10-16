@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/app_auth.dart';
 import '../core/auth/auth_service.dart';
+import '../core/auth/welcome_store.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/auth/auth_ui.dart';
 import '../widgets/social_auth_button.dart';
@@ -127,32 +128,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) {
         return;
       }
-      
-      // Fetch user role from backend and respect the API redirect for moderators.
-      try {
-        final loginData = await AuthService.instance.loginWithRole();
-        final roleString = loginData['user']['role'] as String?;
-        final redirectRoute = (loginData['redirectRoute'] as String?) ??
-            AppAuth.instance.getHomeRouteForRole(roleString);
 
-        AppAuth.instance.setRoleFromApi(roleString);
-        if (!mounted) return;
-        context.go(redirectRoute);
-        return;
-      } catch (e) {
-        final fallbackRole = await AuthService.instance.getCurrentUserRole();
-        AppAuth.instance.setRoleFromApi(fallbackRole);
-      }
-
+      final session = await AuthService.instance.resolveLoginSession();
+      final redirectRoute =
+          session.redirectRoute ??
+          AppAuth.instance.getHomeRouteForRole(session.role);
+      AppAuth.instance.setRoleFromApi(session.role);
       if (!mounted) return;
-      context.go(AppAuth.instance.getHomeRoute());
+      context.go(redirectRoute);
     } on FirebaseAuthException catch (error) {
       if (mounted) {
         _showError(
           AuthService.instance.authErrorMessage(error),
           actionLabel: error.code == 'email-already-in-use' ? 'Log in' : null,
           onAction: error.code == 'email-already-in-use'
-              ? () => context.go('/login')
+              ? () => context.push('/login')
               : null,
         );
       }
@@ -202,34 +192,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  InputDecoration _fieldDecoration({
-    required String label,
-    required String hint,
-    required IconData icon,
-    Widget? suffix,
-  }) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      prefixIcon: Icon(icon, color: AppTheme.primaryColor),
-      suffixIcon: suffix,
-      filled: true,
-      fillColor: const Color(0xFFF8FAFB),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE6EEF0)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE6EEF0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.8),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -237,56 +199,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: AuthFormShell(
         leading: AuthBackButton(
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
+          fallbackRoute: WelcomeStore.seen ? '/login' : '/welcome',
         ),
         title: 'Create your account',
-        subtitle:
-            'Join PeerLearnHub and start your learning journey in minutes.',
-        footer: AuthFooterLink(
-          prompt: 'Already have an account?',
-          actionLabel: 'Sign in',
-          onTap: () => context.go('/login'),
+        subtitle: 'Join PeerLearnHub and start your learning journey.',
+        footer: Column(
+          children: [
+            AuthFooterLink(
+              prompt: 'Already have an account?',
+              actionLabel: 'Sign in',
+              onTap: () => context.push('/login'),
+            ),
+            const SizedBox(height: 8),
+            AuthQuietLink(
+              label: 'Register as Moderator',
+              onTap: () => context.push('/moderation/register'),
+            ),
+          ],
         ),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const AuthFieldLabel('Full name'),
               TextFormField(
                 controller: _fullNameController,
                 textInputAction: TextInputAction.next,
-                decoration: _fieldDecoration(
-                  label: 'Full name',
+                textCapitalization: TextCapitalization.words,
+                autofillHints: const [AutofillHints.name],
+                decoration: authFieldDecoration(
                   hint: 'Enter your full name',
-                  icon: Icons.person_outline,
+                  icon: Icons.person_outline_rounded,
                 ),
                 validator: _validateName,
               ),
               const SizedBox(height: 16),
+              const AuthFieldLabel('Email address'),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
-                decoration: _fieldDecoration(
-                  label: 'Email address',
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                decoration: authFieldDecoration(
                   hint: 'you@example.com',
-                  icon: Icons.email_outlined,
+                  icon: Icons.mail_outline_rounded,
                 ),
                 validator: _validateEmail,
               ),
               const SizedBox(height: 16),
+              const AuthFieldLabel('Password'),
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 textInputAction: TextInputAction.next,
-                decoration: _fieldDecoration(
-                  label: 'Password',
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: authFieldDecoration(
                   hint: 'Create a password',
-                  icon: Icons.lock_outline,
+                  icon: Icons.lock_outline_rounded,
                   suffix: IconButton(
                     onPressed: () {
                       setState(() => _obscurePassword = !_obscurePassword);
@@ -301,16 +272,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: _validatePassword,
               ),
+              const SizedBox(height: 6),
+              Text(
+                'Use at least 6 characters.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
               const SizedBox(height: 16),
+              const AuthFieldLabel('Confirm password'),
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
                 textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
                 onFieldSubmitted: (_) => _register(),
-                decoration: _fieldDecoration(
-                  label: 'Confirm password',
+                decoration: authFieldDecoration(
                   hint: 'Re-enter your password',
-                  icon: Icons.lock_reset_rounded,
+                  icon: Icons.lock_outline_rounded,
                   suffix: IconButton(
                     onPressed: () {
                       setState(
@@ -328,15 +307,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: _validateConfirmPassword,
               ),
-              const SizedBox(height: 22),
-              Text(
-                'What do you want to achieve?',
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
+              const AuthFieldLabel('What do you want to achieve?'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -346,19 +318,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: Text(goal),
                     selected: selected,
                     showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     onSelected: (_) => setState(() => _selectedGoal = goal),
-                    selectedColor: AppTheme.iconBackground,
-                    backgroundColor: const Color(0xFFF8FAFB),
+                    selectedColor: AppTheme.primaryColor,
+                    backgroundColor: const Color(0xFFF8FBFA),
                     side: BorderSide(
                       color: selected
                           ? AppTheme.primaryColor
-                          : const Color(0xFFE6EEF0),
+                          : const Color(0xFFD5E3E0),
                     ),
                     labelStyle: TextStyle(
-                      color: selected
-                          ? AppTheme.primaryDark
-                          : AppTheme.textSecondary,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 13,
+                      color: selected ? Colors.white : AppTheme.textSecondary,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
@@ -366,70 +339,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFB),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE6EEF0)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: Checkbox(
-                        value: _agreedToTerms,
-                        onChanged: (value) =>
-                            setState(() => _agreedToTerms = value ?? false),
-                        activeColor: AppTheme.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Checkbox(
+                    value: _agreedToTerms,
+                    onChanged: (value) =>
+                        setState(() => _agreedToTerms = value ?? false),
+                    activeColor: AppTheme.primaryColor,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () =>
+                          setState(() => _agreedToTerms = !_agreedToTerms),
                       child: Text(
                         'I agree to the Terms & Conditions and Privacy Policy',
                         style: textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textPrimary,
-                          height: 1.45,
+                          height: 1.4,
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               AuthPrimaryButton(
                 label: 'Create account',
                 isLoading: _isSubmitting,
                 onPressed: _isSubmitting ? null : _register,
               ),
-              const SizedBox(height: 24),
-              const AuthSectionDivider(),
               const SizedBox(height: 20),
+              const AuthSectionDivider(),
+              const SizedBox(height: 16),
               SocialAuthButton(
                 label: 'Continue with Google',
                 icon: Icons.g_mobiledata_rounded,
                 isLoading: _isGoogleSubmitting,
                 onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: () => context.go('/moderation/register'),
-                  child: const Text(
-                    'Register as Moderator',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
